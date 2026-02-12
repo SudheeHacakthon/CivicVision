@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Crowdsourced Infrastructure Monitor
 
 A hackathon project for monitoring infrastructure issues through crowdsourced reports.
@@ -21,3 +22,6 @@ Flutter → FastAPI → TensorFlow model → MongoDB
 - `backend-api/`: FastAPI backend
 - `model-training/`: Model training scripts
 - `docs/`: Documentation
+=======
+# CivicVision
+>>>>>>> 94142985d789a0808932b3393bca258a1a799a57
