@@ -12,6 +12,9 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import ListFlowable
 from fastapi.responses import FileResponse
+import requests
+from fastapi import HTTPException
+from pydantic import BaseModel
 
 
 router = APIRouter()
@@ -35,16 +38,19 @@ async def predict(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    categories = ["Pothole", "Garbage Dump", "Broken Streetlight"]
-    category = random.choice(categories)
-    confidence = round(random.uniform(0.80, 0.98), 2)
+    from app.model.model_loader import predict_image
+    prediction = predict_image(file_path)
+    print("MODEL OUTPUT:", prediction)
+    category = prediction["category"]
+    confidence = prediction["confidence"]
 
-    # 🔥 generate letter with complaint_id
+
+    #  generate letter with complaint_id
     letter_text = generate_complaint_letter(
         complaint_id, category, latitude, longitude
     )
 
-    # 🔥 generate pdf
+    #  generate pdf
     pdf_path = generate_pdf_letter(complaint_id, letter_text)
 
     db = get_database()
@@ -171,7 +177,7 @@ def get_authority(category):
         "Broken Streetlight": "Electrical & Street Lighting Wing"
     }
     return mapping.get(category, "Municipal Commissioner")
-import requests
+
 
 def get_location_name(latitude, longitude):
     try:
@@ -211,13 +217,13 @@ def get_relevant_authority(category):
             "Electrical & Street Lighting Wing"
         )
 
-    if category == "Pothole":
+    if category == "Pothole" or category=="Road Crack":
         return (
             "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad",
             "Roads & Maintenance Department"
         )
 
-    if category == "Garbage Dump":
+    if category == "Garbage":
         return (
             "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad",
             "Sanitation & Waste Management Department"
@@ -265,8 +271,7 @@ A Responsible Citizen
 """
 
 
-from fastapi import HTTPException
-from pydantic import BaseModel
+
 
 class StatusUpdate(BaseModel):
     status: str
