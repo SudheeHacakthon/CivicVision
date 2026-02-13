@@ -1,0 +1,40 @@
+name: mobile_app1
+description: "CivicVision - AI Powered Civic Issue Reporter"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # --- UI & Experience ---
+  flutter_lucide: ^1.8.2          # Your premium icon set
+  google_fonts: ^6.2.1            # For the Poppins font style
+  shimmer: ^3.0.0                 # For impressive loading effects
+
+  # --- Hardware & Location ---
+  camera: ^0.11.3+1               # For the mandatory shutter logic
+  geolocator: ^14.0.2             # For auto-GPS tagging
+  image_picker: ^1.2.1            # Fallback for gallery uploads
+
+  # --- Maps & Data ---
+  flutter_map: ^8.2.0             # Open-source map engine
+  flutter_map_location_marker: ^10.2.0
+  latlong2: ^0.9.1                # Required for map coordinates
+  http: ^1.6.0                    # To talk to your Python backend
+
+  # --- File Handling ---
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
