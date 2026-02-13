@@ -4,6 +4,15 @@ from datetime import datetime
 import random
 import uuid
 import os
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import ListFlowable
+from fastapi.responses import FileResponse
+
 
 router = APIRouter()
 
@@ -23,17 +32,20 @@ async def predict(
     complaint_id = str(uuid.uuid4())
     file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
 
-    # Save image locally
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    # Dummy classification (temporary)
     categories = ["Pothole", "Garbage Dump", "Broken Streetlight"]
     category = random.choice(categories)
     confidence = round(random.uniform(0.80, 0.98), 2)
 
-    # ✅ Generate letter AFTER category is defined
-    letter_text = generate_complaint_letter(category, latitude, longitude)
+    # 🔥 generate letter with complaint_id
+    letter_text = generate_complaint_letter(
+        complaint_id, category, latitude, longitude
+    )
+
+    # 🔥 generate pdf
+    pdf_path = generate_pdf_letter(complaint_id, letter_text)
 
     db = get_database()
 
@@ -44,6 +56,7 @@ async def predict(
         "latitude": latitude,
         "longitude": longitude,
         "image_path": file_path,
+        "pdf_path": pdf_path,
         "letter": letter_text,
         "status": "Submitted",
         "created_at": datetime.utcnow()
@@ -52,11 +65,19 @@ async def predict(
     db["complaints"].insert_one(complaint_data)
 
     return {
-        "complaint_id": complaint_id,
-        "category": category,
-        "confidence": confidence,
-        "status": "Submitted",
-        "letter": letter_text
+        "complaint": {
+            "complaint_id": complaint_id,
+            "category": category,
+            "confidence": confidence,
+            "status": "Submitted"
+        },
+        "location": {
+            "latitude": latitude,
+            "longitude": longitude
+        },
+        "pdf_download_url": f"/download/{complaint_id}",
+        "letter": letter_text,
+        "message": "Complaint successfully registered"
     }
 
 
@@ -76,6 +97,55 @@ def get_complaint(complaint_id: str):
     )
     return complaint
 
+@router.get("/download/{complaint_id}")
+def download_pdf(complaint_id: str):
+    pdf_path = f"uploads/{complaint_id}.pdf"
+
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="PDF not found")
+
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=f"{complaint_id}.pdf"
+    )
+
+@router.get("/admin/dashboard")
+def admin_dashboard():
+    db = get_database()
+
+    total = db["complaints"].count_documents({})
+    submitted = db["complaints"].count_documents({"status": "Submitted"})
+    in_progress = db["complaints"].count_documents({"status": "In Progress"})
+    resolved = db["complaints"].count_documents({"status": "Resolved"})
+
+    return {
+        "total_complaints": total,
+        "status_breakdown": {
+            "submitted": submitted,
+            "in_progress": in_progress,
+            "resolved": resolved
+        }
+    }
+
+@router.get("/analytics")
+def analytics():
+    db = get_database()
+
+    pipeline = [
+        {
+            "$group": {
+                "_id": "$category",
+                "count": {"$sum": 1}
+            }
+        }
+    ]
+
+    results = list(db["complaints"].aggregate(pipeline))
+
+    return {
+        "complaints_by_category": results
+    }
 
 @router.get("/heatmap")
 def get_heatmap_data():
@@ -94,29 +164,106 @@ def get_heatmap_data():
 
     return heatmap_data
 
+def get_authority(category):
+    mapping = {
+        "Pothole": "Chief Engineer, Roads & Engineering Wing",
+        "Garbage Dump": "Sanitation & Solid Waste Management Department",
+        "Broken Streetlight": "Electrical & Street Lighting Wing"
+    }
+    return mapping.get(category, "Municipal Commissioner")
+import requests
 
+def get_location_name(latitude, longitude):
+    try:
+        url = "https://nominatim.openstreetmap.org/reverse"
+        params = {
+            "lat": latitude,
+            "lon": longitude,
+            "format": "json"
+        }
 
+        headers = {
+            "User-Agent": "civic-monitor-app"
+        }
 
-def generate_complaint_letter(category, latitude, longitude):
+        response = requests.get(url, params=params, headers=headers)
+        data = response.json()
+
+        address = data.get("address", {})
+
+        suburb = address.get("suburb") or address.get("neighbourhood")
+        city = address.get("city") or address.get("town") or address.get("village")
+        state = address.get("state")
+
+        parts = [suburb, city, state]
+        location = ", ".join([p for p in parts if p])
+
+        return location if location else f"coordinates ({latitude}, {longitude})"
+
+    except Exception:
+        return f"coordinates ({latitude}, {longitude})"
+
+def get_relevant_authority(category):
+
+    if category == "Broken Streetlight":
+        return (
+            "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad",
+            "Electrical & Street Lighting Wing"
+        )
+
+    if category == "Pothole":
+        return (
+            "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad",
+            "Roads & Maintenance Department"
+        )
+
+    if category == "Garbage Dump":
+        return (
+            "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad",
+            "Sanitation & Waste Management Department"
+        )
+
+    return (
+        "Municipal Corporation",
+        "Public Works Department"
+    )
+
+def generate_complaint_letter(complaint_id, category, latitude, longitude):
+    location_name = get_location_name(latitude, longitude)
+    authority_name, department = get_relevant_authority(category)
+
+    today_date = datetime.utcnow().strftime("%d %B %Y")
+
     return f"""
-To,
-The Municipal Commissioner,
-[City Name]
+Date: {today_date}
 
-Subject: Complaint regarding {category} at coordinates ({latitude}, {longitude})
+To,
+The Head,
+{department},
+{authority_name}.
+
+Subject: Urgent Complaint regarding {category} at {location_name} ({latitude}, {longitude})
 
 Respected Sir/Madam,
 
-I would like to bring to your attention that a {category} has been observed at the above-mentioned location.
-This issue is causing inconvenience to the public and may pose safety risks if not addressed promptly.
+I would like to formally report a civic issue identified as "{category}" at the following location:
 
-I kindly request the concerned department to take necessary action at the earliest.
+Area: {location_name}
+Latitude: {latitude}
+Longitude: {longitude}
+
+This issue is currently causing inconvenience to the public and may pose safety hazards if not addressed promptly.
+
+I request the concerned department to kindly inspect and resolve the matter at the earliest.
+
+Complaint Reference ID: {complaint_id}
 
 Thanking you.
 
 Sincerely,
 A Responsible Citizen
 """
+
 
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -152,3 +299,21 @@ def update_status(complaint_id: str, update: StatusUpdate):
         "complaint_id": complaint_id,
         "new_status": update.status
     }
+
+def generate_pdf_letter(complaint_id, letter_text):
+
+    pdf_path = f"uploads/{complaint_id}.pdf"
+
+    doc = SimpleDocTemplate(pdf_path, pagesize=A4)
+    elements = []
+
+    styles = getSampleStyleSheet()
+    normal_style = styles["Normal"]
+
+    for line in letter_text.split("\n"):
+        elements.append(Paragraph(line, normal_style))
+        elements.append(Spacer(1, 0.2 * inch))
+
+    doc.build(elements)
+
+    return pdf_path
