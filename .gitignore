@@ -1,0 +1,33 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# Model & Dataset
+model-training/dataset/
+model-training/saved_model/
+
+# Mongo
+*.log
+
+# Flutter
+mobile-app/build/
+mobile-app/.dart_tool/
+mobile-app/.packages
+mobile-app/.flutter-plugins
+mobile-app/.flutter-plugins-dependencies
+mobile-app/.idea/
+mobile-app/ios/Pods/
+mobile-app/android/.gradle/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Misc
+*.swp
