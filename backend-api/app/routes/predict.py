@@ -1,8 +1,13 @@
+<<<<<<< HEAD
 from fastapi import APIRouter, UploadFile, File, Form
+=======
+from fastapi import APIRouter, UploadFile, File
+>>>>>>> origin/frontend-feature
 from app.database.mongodb import get_database
 from datetime import datetime
 import random
 import uuid
+<<<<<<< HEAD
 import os
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import ParagraphStyle
@@ -16,6 +21,8 @@ import requests
 from fastapi import HTTPException
 from pydantic import BaseModel
 
+=======
+>>>>>>> origin/frontend-feature
 
 router = APIRouter()
 
@@ -26,6 +33,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 @router.post("/predict")
+<<<<<<< HEAD
 async def predict(
     file: UploadFile = File(...),
     latitude: float = Form(...),
@@ -52,6 +60,16 @@ async def predict(
 
     #  generate pdf
     pdf_path = generate_pdf_letter(complaint_id, letter_text)
+=======
+async def predict(file: UploadFile = File(...)):
+
+    # Dummy classification (temporary)
+    categories = ["Pothole", "Garbage Dump", "Broken Streetlight"]
+    category = random.choice(categories)
+    confidence = round(random.uniform(0.80, 0.98), 2)
+
+    complaint_id = str(uuid.uuid4())
+>>>>>>> origin/frontend-feature
 
     db = get_database()
 
@@ -59,11 +77,14 @@ async def predict(
         "complaint_id": complaint_id,
         "category": category,
         "confidence": confidence,
+<<<<<<< HEAD
         "latitude": latitude,
         "longitude": longitude,
         "image_path": file_path,
         "pdf_path": pdf_path,
         "letter": letter_text,
+=======
+>>>>>>> origin/frontend-feature
         "status": "Submitted",
         "created_at": datetime.utcnow()
     }
@@ -71,6 +92,7 @@ async def predict(
     db["complaints"].insert_one(complaint_data)
 
     return {
+<<<<<<< HEAD
         "complaint": {
             "complaint_id": complaint_id,
             "category": category,
@@ -322,3 +344,10 @@ def generate_pdf_letter(complaint_id, letter_text):
     doc.build(elements)
 
     return pdf_path
+=======
+        "complaint_id": complaint_id,
+        "category": category,
+        "confidence": confidence,
+        "status": "Submitted"
+    }
+>>>>>>> origin/frontend-feature
