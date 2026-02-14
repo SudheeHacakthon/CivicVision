@@ -8,10 +8,14 @@ class ResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Safely retrieve arguments passed from CaptureScreen
+
     final args =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-    final String path = args['imagePath'];
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+    final imagePath = args?['imagePath']?.toString() ?? "";
+    final issueType = args?['issueType']?.toString() ?? "Unknown";
+    final confidence = args?['confidence']?.toString() ?? "0";
+    final complaintId = args?['complaintId']?.toString() ?? "N/A";
 
     return Scaffold(
       appBar: AppBar(
@@ -31,33 +35,31 @@ class ResultScreen extends StatelessWidget {
                   BoxShadow(color: Colors.black26, blurRadius: 10),
                 ],
               ),
-              // FIX: This prevents the 'Image.file is not supported on Web' error
               child: kIsWeb
-                  ? Image.network(path, fit: BoxFit.cover)
-                  : Image.file(File(path), fit: BoxFit.cover),
+                  ? Image.network(imagePath, fit: BoxFit.cover)
+                  : Image.file(File(imagePath), fit: BoxFit.cover),
             ),
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  // FIX: Corrected icon names to prevent 'undefined_getter' errors
                   _buildResultRow(
                     "Detected Issue",
-                    args['issueType'],
+                    issueType,
                     LucideIcons.triangle_alert,
                     Colors.orange,
                   ),
                   _buildResultRow(
                     "AI Confidence",
-                    args['confidence'] ?? "94.2%",
+                    confidence,
                     LucideIcons.brain,
                     Colors.blue,
                   ),
                   _buildResultRow(
-                    "Priority",
-                    args['severity'],
-                    LucideIcons.zap,
-                    Colors.red,
+                    "Complaint ID",
+                    complaintId,
+                    LucideIcons.file_text,
+                    Colors.purple,
                   ),
                   const SizedBox(height: 40),
                   ElevatedButton(

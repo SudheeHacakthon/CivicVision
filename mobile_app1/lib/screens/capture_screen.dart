@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'dart:io';
+import '../services/api_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class CaptureScreen extends StatefulWidget {
   final List<CameraDescription>? cameras;
@@ -8,6 +11,34 @@ class CaptureScreen extends StatefulWidget {
 
   @override
   State<CaptureScreen> createState() => _CaptureScreenState();
+}
+
+
+Future<Position> _getCurrentLocation() async {
+  bool serviceEnabled;
+  LocationPermission permission;
+
+  serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!serviceEnabled) {
+    throw Exception('Location services are disabled.');
+  }
+
+  permission = await Geolocator.checkPermission();
+
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+  }
+
+  if (permission == LocationPermission.denied ||
+      permission == LocationPermission.deniedForever) {
+    throw Exception('Location permission denied');
+  }
+
+  return await Geolocator.getCurrentPosition(
+    locationSettings: const LocationSettings(
+      accuracy: LocationAccuracy.high,
+    ),
+  );
 }
 
 class _CaptureScreenState extends State<CaptureScreen> {
@@ -26,15 +57,37 @@ class _CaptureScreenState extends State<CaptureScreen> {
   Future<void> _takePictureAndTag() async {
     if (_isProcessing ||
         _controller == null ||
-        !_controller!.value.isInitialized)
+        !_controller!.value.isInitialized) {
       return;
+    }
 
     setState(() => _isProcessing = true);
+
     try {
+      // 📸 Take Picture
       final XFile image = await _controller!.takePicture();
 
-      // Simulate AI Processing Delay for the "Wow" factor
-      await Future.delayed(const Duration(milliseconds: 1500));
+      // 📍 Get GPS Location
+      final position = await _getCurrentLocation();
+
+      // 🤖 Call Backend API
+      final result = await ApiService.predict(
+        File(image.path),
+        position.latitude,
+        position.longitude,
+      );
+
+      print("BACKEND RESPONSE: $result");
+
+      final complaint = result['complaint'];
+
+      if (complaint == null) {
+        throw Exception("Backend error: ${result['detail'] ?? 'Complaint data is null'}");
+      }
+
+      final category = complaint['category'] ?? "Unknown";
+      final confidence = complaint['confidence']?.toString() ?? "0";
+      final complaintId = complaint['complaint_id'] ?? "N/A";
 
       if (mounted) {
         Navigator.pushReplacementNamed(
@@ -42,17 +95,21 @@ class _CaptureScreenState extends State<CaptureScreen> {
           '/result',
           arguments: {
             'imagePath': image.path,
-            'issueType': 'Pothole Detected',
-            'severity': 'High',
-            'confidence': '94.2%',
+            'issueType': category,
+            'confidence': confidence,
+            'complaintId': complaintId,
           },
         );
       }
     } catch (e) {
       debugPrint("Capture Error: $e");
-      if (mounted) setState(() => _isProcessing = false);
+    }
+
+    if (mounted) {
+      setState(() => _isProcessing = false);
     }
   }
+
 
   @override
   void dispose() {
