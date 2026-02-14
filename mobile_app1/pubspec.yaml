@@ -21,10 +21,10 @@ dependencies:
   geolocator: ^14.0.2             # For auto-GPS tagging
   image_picker: ^1.2.1            # Fallback for gallery uploads
 
-  # --- Maps & Data ---
-  flutter_map: ^8.2.0             # Open-source map engine
+  # --- Maps & Data ---          # Open-source map engine
   flutter_map_location_marker: ^10.2.0
-  latlong2: ^0.9.1                # Required for map coordinates
+  flutter_map_animations: 0.9.0
+  latlong2: ^0.9.0              # Required for map coordinates
   http: ^1.6.0                    # To talk to your Python backend
 
   # --- File Handling ---

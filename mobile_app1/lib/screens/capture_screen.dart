@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:geolocator/geolocator.dart'; // Added for location
 
 class CaptureScreen extends StatefulWidget {
   final List<CameraDescription>? cameras;
@@ -23,6 +24,25 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
   }
 
+  // New helper method to handle GPS permissions and fetching
+  Future<Position?> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return null;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return null;
+    }
+
+    if (permission == LocationPermission.deniedForever) return null;
+
+    return await Geolocator.getCurrentPosition();
+  }
+
   Future<void> _takePictureAndTag() async {
     if (_isProcessing ||
         _controller == null ||
@@ -31,7 +51,11 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
     setState(() => _isProcessing = true);
     try {
+      // 1. Capture the image
       final XFile image = await _controller!.takePicture();
+
+      // 2. Fetch location while the user sees "AI ANALYZING..."
+      Position? position = await _getCurrentLocation();
 
       // Simulate AI Processing Delay for the "Wow" factor
       await Future.delayed(const Duration(milliseconds: 1500));
@@ -45,6 +69,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
             'issueType': 'Pothole Detected',
             'severity': 'High',
             'confidence': '94.2%',
+            // 3. Pass location data to the next screen
+            'latitude': position?.latitude,
+            'longitude': position?.longitude,
           },
         );
       }

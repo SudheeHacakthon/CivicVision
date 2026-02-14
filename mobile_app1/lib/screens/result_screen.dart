@@ -11,7 +11,13 @@ class ResultScreen extends StatelessWidget {
     // Safely retrieve arguments passed from CaptureScreen
     final args =
         ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+
     final String path = args['imagePath'];
+    final double? lat = args['latitude'];
+    final double? lng = args['longitude'];
+
+    print("Received Latitude: $lat");
+    print("Received Longitude: $lng");
 
     return Scaffold(
       appBar: AppBar(
