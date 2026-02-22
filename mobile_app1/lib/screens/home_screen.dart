@@ -8,7 +8,8 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3E5F5),
-      body: Container(
+      body: SingleChildScrollView(
+        child: Container (
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -52,6 +53,35 @@ class HomeScreen extends StatelessWidget {
               LucideIcons.shield_alert,
               '/capture',
             ),
+            const SizedBox(height: 30),
+
+              _buildCard(
+                context,
+                "My Complaints",
+                    "Track your submitted reports",
+                  Colors.blue.shade400,
+                LucideIcons.file_text,
+                '/complaints',
+                    ),
+
+            const SizedBox(height: 20),
+
+            _buildCard(context,
+            "Admin Dashboard",
+              "Monitor & manage complaints",
+              Colors.green.shade600,
+              LucideIcons.layout_dashboard,
+              '/admin_dashboard',
+              ),
+              const SizedBox(height: 20),
+              _buildCard(
+              context,
+              "Analytics",
+              "View city statistics",
+              Colors.orange.shade600,
+              LucideIcons.brain,
+              '/analytics',),
+
             const SizedBox(height: 20),
             _buildCard(
               context,
@@ -61,8 +91,8 @@ class HomeScreen extends StatelessWidget {
               LucideIcons.camera,
               '/capture',
             ),
+            const SizedBox(height: 40),
 
-            const Spacer(),
             Center(
               child: TextButton.icon(
                 onPressed: () => Navigator.pushNamed(context, '/map'),
@@ -80,6 +110,7 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 40),
           ],
         ),
+      ),
       ),
     );
   }

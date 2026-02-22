@@ -122,15 +122,19 @@ def admin_dashboard():
 
     total = db["complaints"].count_documents({})
     submitted = db["complaints"].count_documents({"status": "Submitted"})
+    in_review = db["complaints"].count_documents({"status": "In Review"})
     in_progress = db["complaints"].count_documents({"status": "In Progress"})
     resolved = db["complaints"].count_documents({"status": "Resolved"})
+    rejected = db["complaints"].count_documents({"status": "Rejected"})
 
     return {
         "total_complaints": total,
         "status_breakdown": {
             "submitted": submitted,
+            "in_review": in_review,
             "in_progress": in_progress,
-            "resolved": resolved
+            "resolved": resolved,
+            "rejected": rejected
         }
     }
 
@@ -281,7 +285,7 @@ class StatusUpdate(BaseModel):
 def update_status(complaint_id: str, update: StatusUpdate):
     db = get_database()
 
-    allowed_statuses = ["Submitted", "In Progress", "Resolved"]
+    allowed_statuses = ["Submitted", "In Review", "In Progress", "Resolved", "Rejected"]
 
     if update.status not in allowed_statuses:
         raise HTTPException(status_code=400, detail="Invalid status value")
