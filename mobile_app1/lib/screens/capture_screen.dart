@@ -55,60 +55,61 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   Future<void> _takePictureAndTag() async {
-    if (_isProcessing ||
-        _controller == null ||
-        !_controller!.value.isInitialized) {
-      return;
+  if (_isProcessing ||
+      _controller == null ||
+      !_controller!.value.isInitialized) {
+    return;
+  }
+
+  setState(() => _isProcessing = true);
+
+  try {
+    // 📸 Take Picture
+    final XFile image = await _controller!.takePicture();
+
+    // 📍 Get GPS Location
+    final position = await _getCurrentLocation();
+
+    // 🤖 Call Backend API
+    final result = await ApiService.predict(
+      File(image.path),
+      position.latitude,
+      position.longitude,
+    );
+
+    print("BACKEND RESPONSE: $result");
+
+    final complaint = result['complaint'];
+
+    if (complaint == null) {
+      throw Exception(
+          "Backend error: ${result['detail'] ?? 'Complaint data is null'}");
     }
 
-    setState(() => _isProcessing = true);
-
-    try {
-      // 📸 Take Picture
-      final XFile image = await _controller!.takePicture();
-
-      // 📍 Get GPS Location
-      final position = await _getCurrentLocation();
-
-      // 🤖 Call Backend API
-      final result = await ApiService.predict(
-        File(image.path),
-        position.latitude,
-        position.longitude,
-      );
-
-      print("BACKEND RESPONSE: $result");
-
-      final complaint = result['complaint'];
-
-      if (complaint == null) {
-        throw Exception("Backend error: ${result['detail'] ?? 'Complaint data is null'}");
-      }
-
-      final category = complaint['category'] ?? "Unknown";
-      final confidence = complaint['confidence']?.toString() ?? "0";
-      final complaintId = complaint['complaint_id'] ?? "N/A";
-
-      if (mounted) {
-        Navigator.pushReplacementNamed(
-          context,
-          '/result',
-          arguments: {
-            'imagePath': image.path,
-            'issueType': category,
-            'confidence': confidence,
-            'complaintId': complaintId,
-          },
-        );
-      }
-    } catch (e) {
-      debugPrint("Capture Error: $e");
-    }
+    // 🔥 VERY IMPORTANT — Dispose camera before navigation
+    await _controller?.dispose();
 
     if (mounted) {
-      setState(() => _isProcessing = false);
+      Navigator.pushReplacementNamed(
+        context,
+        '/result',
+        arguments: {
+          'imagePath': image.path,
+          'issueType': complaint['category']?.toString() ?? "Unknown",
+          'confidence': complaint['confidence']?.toString() ?? "0",
+          'complaintId': complaint['complaint_id']?.toString() ?? "N/A",
+          'letter': result['letter']?.toString() ?? "Letter not generated",
+        },
+      );
     }
+  } catch (e) {
+    debugPrint("Capture Error: $e");
   }
+
+  if (mounted) {
+    setState(() => _isProcessing = false);
+  }
+}
 
 
   @override

@@ -5,6 +5,10 @@ import 'screens/home_screen.dart';
 import 'screens/capture_screen.dart';
 import 'screens/result_screen.dart';
 import 'screens/map_screen.dart';
+import 'screens/complaints_screen.dart';
+import 'screens/complaint_detail_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
+import 'screens/analytics_screen.dart';
 
 List<CameraDescription> globalCameras = [];
 
@@ -37,6 +41,10 @@ class CivicVisionApp extends StatelessWidget {
         '/capture': (context) => CaptureScreen(cameras: globalCameras),
         '/result': (context) => const ResultScreen(),
         '/map': (context) => const MapScreen(),
+        '/complaints': (context) => const ComplaintsScreen(),
+        '/complaint_detail': (context) => const ComplaintDetailScreen(),
+        '/admin_dashboard': (context) => const AdminDashboardScreen(),
+        '/analytics': (context) => const AnalyticsScreen(),
       },
     );
   }

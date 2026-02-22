@@ -3,12 +3,37 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-class ResultScreen extends StatelessWidget {
+class ResultScreen extends StatefulWidget {
   const ResultScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<ResultScreen> createState() => _ResultScreenState();
+}
 
+class _ResultScreenState extends State<ResultScreen> {
+  late TextEditingController _letterController;
+  bool isEditing = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+    final letter = args?['letter']?.toString() ?? "";
+
+    _letterController = TextEditingController(text: letter);
+  }
+
+  @override
+  void dispose() {
+    _letterController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
@@ -22,65 +47,94 @@ class ResultScreen extends StatelessWidget {
         title: const Text("AI Evaluation"),
         backgroundColor: const Color(0xFF4A148C),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: Icon(isEditing ? Icons.check : Icons.edit),
+            onPressed: () {
+              setState(() {
+                isEditing = !isEditing;
+              });
+            },
+          )
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // IMAGE
             Container(
-              height: 320,
+              height: 300,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                boxShadow: const [
-                  BoxShadow(color: Colors.black26, blurRadius: 10),
-                ],
-              ),
+              color: Colors.grey[300],
               child: kIsWeb
                   ? Image.network(imagePath, fit: BoxFit.cover)
                   : Image.file(File(imagePath), fit: BoxFit.cover),
             ),
+
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildResultRow(
-                    "Detected Issue",
-                    issueType,
-                    LucideIcons.triangle_alert,
-                    Colors.orange,
+
+                  _infoTile("Issue Type", issueType),
+                  _infoTile("Confidence", confidence),
+                  _infoTile("Complaint ID", complaintId),
+
+                  const SizedBox(height: 25),
+
+                  const Text(
+                    "Official Complaint Letter",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  _buildResultRow(
-                    "AI Confidence",
-                    confidence,
-                    LucideIcons.brain,
-                    Colors.blue,
+
+                  const SizedBox(height: 10),
+
+                  // LETTER BOX
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: isEditing
+                        ? TextField(
+                            controller: _letterController,
+                            maxLines: null,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                            ),
+                          )
+                        : Text(_letterController.text),
                   ),
-                  _buildResultRow(
-                    "Complaint ID",
-                    complaintId,
-                    LucideIcons.file_text,
-                    Colors.purple,
-                  ),
-                  const SizedBox(height: 40),
+
+                  const SizedBox(height: 30),
+
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4A148C),
-                      minimumSize: const Size(double.infinity, 60),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
+                      minimumSize: const Size(double.infinity, 55),
                     ),
-                    onPressed: () =>
-                        Navigator.popUntil(context, ModalRoute.withName('/')),
+                    onPressed: () {
+                      // later we send edited letter to backend if needed
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Letter Submitted Successfully"),
+                        ),
+                      );
+                    },
                     child: const Text(
                       "SUBMIT TO PORTAL",
                       style: TextStyle(
-                        color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
+                  )
                 ],
               ),
             ),
@@ -90,45 +144,16 @@ class ResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildResultRow(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _infoTile(String title, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.only(bottom: 15),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 24),
+          Text(
+            "$title: ",
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
