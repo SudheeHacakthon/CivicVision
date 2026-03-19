@@ -1,4 +1,8 @@
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, UploadFile, File, Form, Request
+import base64
+from io import BytesIO
+from PIL import Image
+import numpy as np
 from app.database.mongodb import get_database
 from datetime import datetime
 import random
@@ -27,16 +31,47 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @router.post("/predict")
 async def predict(
-    file: UploadFile = File(...),
-    latitude: float = Form(...),
-    longitude: float = Form(...)
+    request: Request,
+    image: str = Form(None),
+    file: UploadFile = File(None),
+    latitude: float = Form(None),
+    longitude: float = Form(None)
 ):
-
     complaint_id = str(uuid.uuid4())
-    file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
 
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
+    # Accept JSON payload from web and multipart/form-data from mobile.
+    if request.headers.get("content-type", "").startswith("application/json"):
+        payload = await request.json()
+        image = payload.get("image")
+        latitude = payload.get("latitude")
+        longitude = payload.get("longitude")
+
+    if latitude is None or longitude is None:
+        raise HTTPException(status_code=400, detail="latitude and longitude are required")
+
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="latitude and longitude must be numbers")
+    
+    # Web: base64 image, Mobile: uploaded file
+    if image:
+        # Support data URLs like: data:image/jpeg;base64,/9j/4AAQ...
+        if "," in image:
+            image = image.split(",", 1)[1]
+        # Decode base64
+        image_data = base64.b64decode(image)
+        image_pil = Image.open(BytesIO(image_data)).convert('RGB')
+        file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
+        image_pil.save(file_path)
+    elif file:
+        # Mobile fallback
+        file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
+        with open(file_path, "wb") as buffer:
+            buffer.write(await file.read())
+    else:
+        raise HTTPException(status_code=400, detail="Provide either base64 image or file upload")
 
     from app.model.model_loader import predict_image
     prediction = predict_image(file_path)
@@ -44,10 +79,12 @@ async def predict(
     category = prediction["category"]
     confidence = prediction["confidence"]
 
+    location_name, city_name = get_location_details(latitude, longitude)
+
 
     #  generate letter with complaint_id
     letter_text = generate_complaint_letter(
-        complaint_id, category, latitude, longitude
+        complaint_id, category, latitude, longitude, location_name
     )
 
     #  generate pdf
@@ -61,6 +98,8 @@ async def predict(
         "confidence": confidence,
         "latitude": latitude,
         "longitude": longitude,
+        "city": city_name,
+        "location_name": location_name,
         "image_path": file_path,
         "pdf_path": pdf_path,
         "letter": letter_text,
@@ -79,7 +118,9 @@ async def predict(
         },
         "location": {
             "latitude": latitude,
-            "longitude": longitude
+            "longitude": longitude,
+            "city": city_name,
+            "location_name": location_name
         },
         "pdf_download_url": f"/download/{complaint_id}",
         "letter": letter_text,
@@ -184,6 +225,10 @@ def get_authority(category):
 
 
 def get_location_name(latitude, longitude):
+    location_name, _ = get_location_details(latitude, longitude)
+    return location_name
+
+def get_location_details(latitude, longitude):
     try:
         url = "https://nominatim.openstreetmap.org/reverse"
         params = {
@@ -207,11 +252,15 @@ def get_location_name(latitude, longitude):
 
         parts = [suburb, city, state]
         location = ", ".join([p for p in parts if p])
+        fallback_city = city or state or "Unknown"
 
-        return location if location else f"coordinates ({latitude}, {longitude})"
+        return (
+            location if location else f"coordinates ({latitude}, {longitude})",
+            fallback_city
+        )
 
     except Exception:
-        return f"coordinates ({latitude}, {longitude})"
+        return (f"coordinates ({latitude}, {longitude})", "Unknown")
 
 def get_relevant_authority(category):
 
@@ -238,8 +287,8 @@ def get_relevant_authority(category):
         "Public Works Department"
     )
 
-def generate_complaint_letter(complaint_id, category, latitude, longitude):
-    location_name = get_location_name(latitude, longitude)
+def generate_complaint_letter(complaint_id, category, latitude, longitude, location_name=None):
+    location_name = location_name or get_location_name(latitude, longitude)
     authority_name, department = get_relevant_authority(category)
 
     today_date = datetime.utcnow().strftime("%d %B %Y")

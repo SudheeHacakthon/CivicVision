@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
-import 'dart:io';
 import '../services/api_service.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -14,24 +13,46 @@ class CaptureScreen extends StatefulWidget {
 }
 
 
-Future<Position> _getCurrentLocation() async {
+Future<Position?> _getCurrentLocation(BuildContext context) async {
   bool serviceEnabled;
   LocationPermission permission;
 
   serviceEnabled = await Geolocator.isLocationServiceEnabled();
   if (!serviceEnabled) {
-    throw Exception('Location services are disabled.');
+    // Show dialog to enable location
+    final shouldEnable = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Location Services Disabled'),
+        content: const Text('Enable location services for better complaint tracking with GPS?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Skip'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (shouldEnable) {
+      await Geolocator.openLocationSettings();
+      return null; // Retry handled by user
+    }
+    return null;
   }
 
   permission = await Geolocator.checkPermission();
-
   if (permission == LocationPermission.denied) {
     permission = await Geolocator.requestPermission();
   }
 
   if (permission == LocationPermission.denied ||
       permission == LocationPermission.deniedForever) {
-    throw Exception('Location permission denied');
+    return null;
   }
 
   return await Geolocator.getCurrentPosition(
@@ -67,14 +88,28 @@ class _CaptureScreenState extends State<CaptureScreen> {
     // 📸 Take Picture
     final XFile image = await _controller!.takePicture();
 
-    // 📍 Get GPS Location
-    final position = await _getCurrentLocation();
+    // 📍 Get GPS Location (nullable)
+    final position = await _getCurrentLocation(context);
+    final lat = position?.latitude ?? 0.0;
+    final lng = position?.longitude ?? 0.0;
 
+    if (position == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location skipped. Complaint will be created without GPS.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+
+    // Read image bytes directly from XFile to support web and mobile.
+    final imageBytes = await image.readAsBytes();
+    
     // 🤖 Call Backend API
     final result = await ApiService.predict(
-      File(image.path),
-      position.latitude,
-      position.longitude,
+      imageBytes,
+      lat,
+      lng,
     );
 
     print("BACKEND RESPONSE: $result");
@@ -86,8 +121,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
           "Backend error: ${result['detail'] ?? 'Complaint data is null'}");
     }
 
-    // 🔥 VERY IMPORTANT — Dispose camera before navigation
+    // 🔥 Dispose camera before navigation and null it so dispose() doesn't double-free
     await _controller?.dispose();
+    _controller = null;
 
     if (mounted) {
       Navigator.pushReplacementNamed(
@@ -104,6 +140,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
   } catch (e) {
     debugPrint("Capture Error: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   if (mounted) {
