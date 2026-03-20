@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+uploads/
+.dart_tool/
+.idea/
+build/
