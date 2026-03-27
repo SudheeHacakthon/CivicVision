@@ -14,11 +14,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String? error;
 
   final List<String> statusOptions = [
+    'Reported',
     'Submitted',
     'In Review',
     'In Progress',
+    'Help Arriving',
     'Resolved',
-    'Rejected'
+    'Rejected',
+    'Closed'
   ];
 
   @override

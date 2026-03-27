@@ -26,6 +26,7 @@ dependencies:
   flutter_map_location_marker: ^10.2.0
   latlong2: ^0.9.1                # Required for map coordinates
   http: ^1.6.0                    # To talk to your Python backend
+  url_launcher: ^6.3.2
 
   # --- File Handling ---
   path_provider: ^2.1.5
