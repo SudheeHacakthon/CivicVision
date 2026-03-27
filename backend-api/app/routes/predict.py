@@ -4,7 +4,7 @@ from io import BytesIO
 from PIL import Image
 import numpy as np
 from app.database.mongodb import get_database
-from datetime import datetime
+from datetime import datetime, timezone
 import random
 import uuid
 import os
@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse
 import requests
 from fastapi import HTTPException
 from pydantic import BaseModel
+from typing import Optional
 
 
 router = APIRouter()
@@ -27,6 +28,26 @@ UPLOAD_FOLDER = "uploads"
 
 # Ensure uploads folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+EMERGENCY_STATUS_FLOW = ["Reported", "In Progress", "Help Arriving", "Resolved", "Closed"]
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class EmergencyReportRequest(BaseModel):
+    image: str
+    latitude: float
+    longitude: float
+    category: str
+    short_text: Optional[str] = None
+
+
+class SosRequest(BaseModel):
+    latitude: float
+    longitude: float
+    note: Optional[str] = None
 
 
 @router.post("/predict")
@@ -38,6 +59,7 @@ async def predict(
     longitude: float = Form(None)
 ):
     complaint_id = str(uuid.uuid4())
+    submitted_at = now_utc()
 
     # Accept JSON payload from web and multipart/form-data from mobile.
     if request.headers.get("content-type", "").startswith("application/json"):
@@ -84,7 +106,7 @@ async def predict(
 
     #  generate letter with complaint_id
     letter_text = generate_complaint_letter(
-        complaint_id, category, latitude, longitude, location_name
+        complaint_id, category, latitude, longitude, location_name, submitted_at
     )
 
     #  generate pdf
@@ -104,7 +126,7 @@ async def predict(
         "pdf_path": pdf_path,
         "letter": letter_text,
         "status": "Submitted",
-        "created_at": datetime.utcnow()
+        "created_at": submitted_at
     }
 
     db["complaints"].insert_one(complaint_data)
@@ -114,7 +136,8 @@ async def predict(
             "complaint_id": complaint_id,
             "category": category,
             "confidence": confidence,
-            "status": "Submitted"
+            "status": "Submitted",
+            "submitted_at": submitted_at.isoformat()
         },
         "location": {
             "latitude": latitude,
@@ -133,6 +156,162 @@ def get_all_complaints():
     db = get_database()
     complaints = list(db["complaints"].find({}, {"_id": 0}))
     return complaints
+
+
+@router.post("/emergency/report")
+def report_emergency(payload: EmergencyReportRequest):
+    complaint_id = str(uuid.uuid4())
+    submitted_at = now_utc()
+
+    image = payload.image
+    if "," in image:
+        image = image.split(",", 1)[1]
+
+    try:
+        image_data = base64.b64decode(image)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid image encoding") from exc
+
+    image_pil = Image.open(BytesIO(image_data)).convert("RGB")
+    file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
+    image_pil.save(file_path)
+
+    location_name, city_name = get_location_details(payload.latitude, payload.longitude)
+
+    db = get_database()
+    emergency_doc = {
+        "complaint_id": complaint_id,
+        "category": payload.category,
+        "confidence": "critical",
+        "priority": "CRITICAL",
+        "is_emergency": True,
+        "report_type": "EMERGENCY",
+        "latitude": payload.latitude,
+        "longitude": payload.longitude,
+        "city": city_name,
+        "location_name": location_name,
+        "short_text": payload.short_text,
+        "image_path": file_path,
+        "status": "Reported",
+        "queue_bypassed": True,
+        "created_at": submitted_at,
+        "updated_at": submitted_at,
+    }
+
+    db["complaints"].insert_one(emergency_doc)
+    db["admin_notifications"].insert_one(
+        {
+            "complaint_id": complaint_id,
+            "kind": "EMERGENCY",
+            "priority": "CRITICAL",
+            "status": "pending",
+            "message": f"Emergency {payload.category} reported at {location_name}",
+            "created_at": submitted_at,
+        }
+    )
+
+    return {
+        "complaint": {
+            "complaint_id": complaint_id,
+            "category": payload.category,
+            "priority": "CRITICAL",
+            "status": "Reported",
+        },
+        "location": {
+            "latitude": payload.latitude,
+            "longitude": payload.longitude,
+            "city": city_name,
+            "location_name": location_name,
+        },
+        "status_flow": EMERGENCY_STATUS_FLOW[:3],
+        "queue_bypassed": True,
+        "admin_notification": "sent",
+        "submitted_at": submitted_at.isoformat(),
+    }
+
+
+@router.post("/emergency/sos")
+def send_sos(payload: SosRequest):
+    complaint_id = str(uuid.uuid4())
+    submitted_at = now_utc()
+    location_name, city_name = get_location_details(payload.latitude, payload.longitude)
+
+    db = get_database()
+    sos_doc = {
+        "complaint_id": complaint_id,
+        "category": "SOS",
+        "priority": "CRITICAL",
+        "is_emergency": True,
+        "report_type": "EMERGENCY",
+        "latitude": payload.latitude,
+        "longitude": payload.longitude,
+        "city": city_name,
+        "location_name": location_name,
+        "short_text": payload.note,
+        "status": "Reported",
+        "queue_bypassed": True,
+        "created_at": submitted_at,
+        "updated_at": submitted_at,
+    }
+    db["complaints"].insert_one(sos_doc)
+    db["admin_notifications"].insert_one(
+        {
+            "complaint_id": complaint_id,
+            "kind": "SOS",
+            "priority": "CRITICAL",
+            "status": "pending",
+            "message": f"SOS alert received at {location_name}",
+            "created_at": submitted_at,
+        }
+    )
+
+    return {
+        "complaint": {
+            "complaint_id": complaint_id,
+            "category": "SOS",
+            "priority": "CRITICAL",
+            "status": "Reported",
+        },
+        "status_flow": EMERGENCY_STATUS_FLOW[:3],
+        "queue_bypassed": True,
+        "admin_notification": "sent",
+        "submitted_at": submitted_at.isoformat(),
+    }
+
+
+@router.get("/emergency/{complaint_id}/status")
+def get_emergency_status(complaint_id: str):
+    db = get_database()
+    complaint = db["complaints"].find_one(
+        {"complaint_id": complaint_id, "is_emergency": True},
+        {"_id": 0, "complaint_id": 1, "status": 1, "updated_at": 1, "priority": 1},
+    )
+
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Emergency complaint not found")
+
+    return complaint
+
+
+@router.put("/emergency/{complaint_id}/status")
+def update_emergency_status(complaint_id: str, update: "StatusUpdate"):
+    if update.status not in EMERGENCY_STATUS_FLOW:
+        raise HTTPException(status_code=400, detail="Invalid emergency status value")
+
+    db = get_database()
+    result = db["complaints"].update_one(
+        {"complaint_id": complaint_id, "is_emergency": True},
+        {"$set": {"status": update.status, "updated_at": now_utc()}},
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Emergency complaint not found")
+
+    return {
+        "message": "Emergency status updated successfully",
+        "complaint_id": complaint_id,
+        "new_status": update.status,
+    }
 
 
 @router.get("/complaint/{complaint_id}")
@@ -165,6 +344,8 @@ def admin_dashboard():
     submitted = db["complaints"].count_documents({"status": "Submitted"})
     in_review = db["complaints"].count_documents({"status": "In Review"})
     in_progress = db["complaints"].count_documents({"status": "In Progress"})
+    reported = db["complaints"].count_documents({"status": "Reported"})
+    help_arriving = db["complaints"].count_documents({"status": "Help Arriving"})
     resolved = db["complaints"].count_documents({"status": "Resolved"})
     rejected = db["complaints"].count_documents({"status": "Rejected"})
 
@@ -172,8 +353,10 @@ def admin_dashboard():
         "total_complaints": total,
         "status_breakdown": {
             "submitted": submitted,
+            "reported": reported,
             "in_review": in_review,
             "in_progress": in_progress,
+            "help_arriving": help_arriving,
             "resolved": resolved,
             "rejected": rejected
         }
@@ -287,14 +470,24 @@ def get_relevant_authority(category):
         "Public Works Department"
     )
 
-def generate_complaint_letter(complaint_id, category, latitude, longitude, location_name=None):
+def generate_complaint_letter(
+    complaint_id,
+    category,
+    latitude,
+    longitude,
+    location_name=None,
+    submitted_at=None,
+):
     location_name = location_name or get_location_name(latitude, longitude)
     authority_name, department = get_relevant_authority(category)
 
-    today_date = datetime.utcnow().strftime("%d %B %Y")
+    submitted_at = submitted_at or now_utc()
+    today_date = submitted_at.strftime("%d %B %Y")
+    submitted_time_utc = submitted_at.strftime("%H:%M:%S UTC")
 
     return f"""
 Date: {today_date}
+Time: {submitted_time_utc}
 
 To,
 The Head,
@@ -334,7 +527,16 @@ class StatusUpdate(BaseModel):
 def update_status(complaint_id: str, update: StatusUpdate):
     db = get_database()
 
-    allowed_statuses = ["Submitted", "In Review", "In Progress", "Resolved", "Rejected"]
+    allowed_statuses = [
+        "Submitted",
+        "In Review",
+        "In Progress",
+        "Resolved",
+        "Rejected",
+        "Reported",
+        "Help Arriving",
+        "Closed",
+    ]
 
     if update.status not in allowed_statuses:
         raise HTTPException(status_code=400, detail="Invalid status value")
@@ -344,7 +546,7 @@ def update_status(complaint_id: str, update: StatusUpdate):
         {
             "$set": {
                 "status": update.status,
-                "updated_at": datetime.utcnow()
+                "updated_at": now_utc()
             }
         }
     )

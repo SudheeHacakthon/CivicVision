@@ -5,6 +5,8 @@ from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
 import os
+import numpy as np
+from sklearn.metrics import classification_report
 
 print("TensorFlow version:", tf.__version__)
 print("GPU Available:", tf.config.list_physical_devices('GPU'))
@@ -97,6 +99,25 @@ history = model.fit(
     validation_data=val_generator,
     epochs=EPOCHS
 )
+
+print("\nGenerating classification report on validation set...")
+
+# Collect predictions and labels from validation generator
+val_generator.reset()
+y_true = []
+y_pred = []
+
+for batch_x, batch_y in val_generator:
+    batch_pred = model.predict(batch_x, verbose=0)
+    y_pred.extend(np.argmax(batch_pred, axis=1))
+    y_true.extend(np.argmax(batch_y, axis=1))
+    if len(y_true) >= val_generator.samples:
+        break
+
+class_names = list(train_generator.class_indices.keys())
+report = classification_report(y_true, y_pred, target_names=class_names, digits=4)
+print("\nClassification Report (Validation Set):")
+print(report)
 
 # ==========================
 # Save Model

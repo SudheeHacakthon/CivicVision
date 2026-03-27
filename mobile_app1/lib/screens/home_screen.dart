@@ -51,9 +51,19 @@ class HomeScreen extends StatelessWidget {
               "Accidents, Hazards, Fires",
               Colors.red.shade400,
               LucideIcons.shield_alert,
-              '/capture',
+              '/emergency',
             ),
             const SizedBox(height: 30),
+
+            _buildCard(
+              context,
+              "Report Issue",
+              "Potholes, Trash, Streetlights",
+              const Color(0xFF7B1FA2),
+              LucideIcons.camera,
+              '/capture',
+            ),
+            const SizedBox(height: 20),
 
               _buildCard(
                 context,
@@ -82,15 +92,6 @@ class HomeScreen extends StatelessWidget {
               LucideIcons.brain,
               '/analytics',),
 
-            const SizedBox(height: 20),
-            _buildCard(
-              context,
-              "Report Issue",
-              "Potholes, Trash, Streetlights",
-              const Color(0xFF7B1FA2),
-              LucideIcons.camera,
-              '/capture',
-            ),
             const SizedBox(height: 40),
 
             Center(

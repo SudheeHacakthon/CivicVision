@@ -9,6 +9,7 @@ import 'screens/complaints_screen.dart';
 import 'screens/complaint_detail_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/analytics_screen.dart';
+import 'screens/emergency_screen.dart';
 
 List<CameraDescription> globalCameras = [];
 
@@ -39,6 +40,7 @@ class CivicVisionApp extends StatelessWidget {
       routes: {
         '/': (context) => const HomeScreen(),
         '/capture': (context) => CaptureScreen(cameras: globalCameras),
+        '/emergency': (context) => EmergencyScreen(cameras: globalCameras),
         '/result': (context) => const ResultScreen(),
         '/map': (context) => const MapScreen(),
         '/complaints': (context) => const ComplaintsScreen(),
