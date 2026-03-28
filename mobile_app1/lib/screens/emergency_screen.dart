@@ -3,8 +3,10 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
 class EmergencyScreen extends StatefulWidget {
@@ -105,12 +107,14 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
       final latitude = _position?.latitude ?? 0.0;
       final longitude = _position?.longitude ?? 0.0;
+      final reporterEmail = context.read<AuthProvider>().email;
 
       final result = await ApiService.submitEmergency(
         imageBytes,
         latitude,
         longitude,
         selectedCategory.apiValue,
+        reporterEmail: reporterEmail,
       );
 
       final complaint = result['complaint'] as Map<String, dynamic>?;
@@ -153,7 +157,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
       final latitude = _position?.latitude ?? 0.0;
       final longitude = _position?.longitude ?? 0.0;
-      final result = await ApiService.triggerSos(latitude, longitude);
+      final reporterEmail = context.read<AuthProvider>().email;
+      final result = await ApiService.triggerSos(
+        latitude,
+        longitude,
+        reporterEmail: reporterEmail,
+      );
       final complaint = result['complaint'] as Map<String, dynamic>?;
 
       if (!mounted) return;
