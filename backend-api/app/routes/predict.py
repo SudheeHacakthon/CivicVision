@@ -7,6 +7,7 @@ from app.services.email_service import send_emergency_alert_email
 from datetime import datetime, timezone
 import uuid
 import os
+import math
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -30,6 +31,33 @@ def get_priority(category):
         return "MEDIUM"
     else:
         return "LOW"
+
+def compute_priority(v, t, rho, category, confidence):
+    Vmax = 100
+    rho_max = 10000
+    lambda_ = 0.1
+
+    w1, w2, w3, w4 = 0.4, 0.2, 0.2, 0.2  # weights
+
+    # U(x)
+    U = min(1, v / Vmax) * math.exp(-lambda_ * t)
+
+    # D(x)
+    D = rho / rho_max
+
+    # C(x)
+    CATEGORY_WEIGHTS = {
+        "Pothole": 0.9,
+        "Road Crack": 0.85,
+        "Garbage": 0.6,
+    }
+    C = CATEGORY_WEIGHTS.get(category, 0.5)
+
+    # Confidence (extra factor)
+    conf = confidence  # already 0–1
+
+    # Final score
+    return w1 * U + w2 * D + w3 * C + w4 * conf
 
 # Ensure uploads folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -115,6 +143,10 @@ async def predict(
     category = prediction["category"]
     confidence = prediction["confidence"]
     priority = get_priority(category)
+    v = 0  # initial upvotes
+    t = 0  # newly created
+    rho = 5000  # dummy (later from API)
+    priority_score = compute_priority(v, t, rho, category, confidence)
 
     location_name, city_name, address_parts = get_location_details(latitude, longitude)
 
@@ -134,6 +166,7 @@ async def predict(
         "category": category,
         "confidence": confidence,
         "priority": priority,
+        "priority_score": priority_score,
         "latitude": latitude,
         "longitude": longitude,
         "city": city_name,
