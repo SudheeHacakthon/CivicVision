@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import 'package:geolocator/geolocator.dart';
+import '../providers/auth_provider.dart';
 
 class CaptureScreen extends StatefulWidget {
   final List<CameraDescription>? cameras;
@@ -129,6 +131,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
       // 🤖 Call Backend API
       final result = await ApiService.predict(imageBytes, lat, lng);
+      // Read image bytes directly from XFile to support web and mobile.
+      final imageBytes = await image.readAsBytes();
+
+      // 🤖 Call Backend API
+      final reporterEmail = context.read<AuthProvider>().email;
+      final result = await ApiService.predict(
+        imageBytes,
+        lat,
+        lng,
+        reporterEmail,
+      );
 
       print("BACKEND RESPONSE: $result");
 

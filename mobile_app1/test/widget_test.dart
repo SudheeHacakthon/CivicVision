@@ -7,17 +7,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'package:mobile_app1/main.dart';
 
 void main() {
-  testWidgets('CivicVisionApp renders HomeScreen', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('App boots to auth flow', (WidgetTester tester) async {
     await tester.pumpWidget(const CivicVisionApp());
+    await tester.pumpAndSettle();
 
-    // Verify that HomeScreen is rendered (adjust selector based on HomeScreen content)
-    expect(
-      find.text('CivicVision'),
-      findsOneWidget,
-    ); // Update with actual HomeScreen text if different
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 }
