@@ -125,12 +125,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
           ),
         );
       }
-
-      // Read image bytes directly from XFile to support web and mobile.
-      final imageBytes = await image.readAsBytes();
-
-      // 🤖 Call Backend API
-      final result = await ApiService.predict(imageBytes, lat, lng);
       // Read image bytes directly from XFile to support web and mobile.
       final imageBytes = await image.readAsBytes();
 
