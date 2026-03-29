@@ -1,6 +1,20 @@
+# Python
 __pycache__/
 *.pyc
+venv/
+.env
+
+# OS
+.DS_Store
+
+# Uploads
 uploads/
-.dart_tool/
-.idea/
+
+# Flutter
+.metadata
 build/
+
+
+*.pt
+*.h5
+*.pth
