@@ -209,7 +209,7 @@ class _MapScreenState extends State<MapScreen> {
                       : () {
                           Navigator.pop(context);
                           Navigator.pushNamed(
-                            context,
+                            this.context,
                             '/complaint_detail',
                             arguments: {'complaintId': rawId},
                           );
@@ -234,7 +234,6 @@ class _MapScreenState extends State<MapScreen> {
 
     final double? lat = args?['latitude'];
     final double? lng = args?['longitude'];
-
     final bool isHeatmap = args?['heatmap'] == true;
 
     final bool hasPassedLocation = lat != null && lng != null;

@@ -36,6 +36,8 @@ pillow==12.1.1
 protobuf==6.33.5
 pydantic==2.12.5
 pydantic_core==2.41.5
+passlib==1.7.4
+bcrypt==4.3.0
 Pygments==2.19.2
 pymongo==4.16.0
 python-dotenv==1.2.1

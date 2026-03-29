@@ -2,34 +2,44 @@ from fastapi import APIRouter, UploadFile, File, Form, Request
 import base64
 from io import BytesIO
 from PIL import Image
-import numpy as np
 from app.database.mongodb import get_database
+from app.services.email_service import send_emergency_alert_email
 from datetime import datetime, timezone
-import random
 import uuid
 import os
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import ListFlowable
 from fastapi.responses import FileResponse
 import requests
 from fastapi import HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from pymongo import ReturnDocument
 
 
 router = APIRouter()
 
 UPLOAD_FOLDER = "uploads"
 
+def get_priority(category):
+    if category in ["Pothole", "Road Crack"]:
+        return "HIGH"
+    elif category == "Garbage":
+        return "MEDIUM"
+    else:
+        return "LOW"
+
 # Ensure uploads folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 EMERGENCY_STATUS_FLOW = ["Reported", "In Progress", "Help Arriving", "Resolved", "Closed"]
+ADMIN_ALERT_EMAILS = [
+    "rizwik475@gmail.com",
+    "priyanshunerella@gmail.com",
+    "mjahnavi956@gmail.com",
+]
 
 
 def now_utc() -> datetime:
@@ -42,12 +52,14 @@ class EmergencyReportRequest(BaseModel):
     longitude: float
     category: str
     short_text: Optional[str] = None
+    reporter_email: Optional[str] = None
 
 
 class SosRequest(BaseModel):
     latitude: float
     longitude: float
     note: Optional[str] = None
+    reporter_email: Optional[str] = None
 
 
 @router.post("/predict")
@@ -56,7 +68,8 @@ async def predict(
     image: str = Form(None),
     file: UploadFile = File(None),
     latitude: float = Form(None),
-    longitude: float = Form(None)
+    longitude: float = Form(None),
+    reporter_email: str = Form(None),
 ):
     complaint_id = str(uuid.uuid4())
     submitted_at = now_utc()
@@ -67,6 +80,7 @@ async def predict(
         image = payload.get("image")
         latitude = payload.get("latitude")
         longitude = payload.get("longitude")
+        reporter_email = payload.get("reporter_email")
 
     if latitude is None or longitude is None:
         raise HTTPException(status_code=400, detail="latitude and longitude are required")
@@ -86,7 +100,7 @@ async def predict(
         image_data = base64.b64decode(image)
         image_pil = Image.open(BytesIO(image_data)).convert('RGB')
         file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
-        image_pil.save(file_path)
+        image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
     elif file:
         # Mobile fallback
         file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
@@ -100,8 +114,9 @@ async def predict(
     print("MODEL OUTPUT:", prediction)
     category = prediction["category"]
     confidence = prediction["confidence"]
+    priority = get_priority(category)
 
-    location_name, city_name = get_location_details(latitude, longitude)
+    location_name, city_name, address_parts = get_location_details(latitude, longitude)
 
 
     #  generate letter with complaint_id
@@ -118,15 +133,19 @@ async def predict(
         "complaint_id": complaint_id,
         "category": category,
         "confidence": confidence,
+        "priority": priority,
         "latitude": latitude,
         "longitude": longitude,
         "city": city_name,
         "location_name": location_name,
+        "address": address_parts,
         "image_path": file_path,
         "pdf_path": pdf_path,
         "letter": letter_text,
         "status": "Submitted",
-        "created_at": submitted_at
+        "upvotes": 0,
+        "created_at": submitted_at.isoformat(),
+        "reporter_email": (reporter_email or "").strip().lower(),
     }
 
     db["complaints"].insert_one(complaint_data)
@@ -143,7 +162,8 @@ async def predict(
             "latitude": latitude,
             "longitude": longitude,
             "city": city_name,
-            "location_name": location_name
+            "location_name": location_name,
+            "address": address_parts,
         },
         "pdf_download_url": f"/download/{complaint_id}",
         "letter": letter_text,
@@ -155,6 +175,22 @@ async def predict(
 def get_all_complaints():
     db = get_database()
     complaints = list(db["complaints"].find({}, {"_id": 0}))
+    return complaints
+
+
+@router.get("/complaints/my")
+def get_my_complaints(email: str):
+    normalized_email = (email or "").strip().lower()
+    if not normalized_email:
+        raise HTTPException(status_code=400, detail="email is required")
+
+    db = get_database()
+    complaints = list(
+        db["complaints"].find(
+            {"reporter_email": normalized_email},
+            {"_id": 0},
+        )
+    )
     return complaints
 
 
@@ -174,9 +210,9 @@ def report_emergency(payload: EmergencyReportRequest):
 
     image_pil = Image.open(BytesIO(image_data)).convert("RGB")
     file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
-    image_pil.save(file_path)
+    image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
 
-    location_name, city_name = get_location_details(payload.latitude, payload.longitude)
+    location_name, city_name, address_parts = get_location_details(payload.latitude, payload.longitude)
 
     db = get_database()
     emergency_doc = {
@@ -190,12 +226,15 @@ def report_emergency(payload: EmergencyReportRequest):
         "longitude": payload.longitude,
         "city": city_name,
         "location_name": location_name,
+        "address": address_parts,
         "short_text": payload.short_text,
         "image_path": file_path,
         "status": "Reported",
+        "upvotes": 0,
         "queue_bypassed": True,
-        "created_at": submitted_at,
+        "created_at": submitted_at.isoformat(),
         "updated_at": submitted_at,
+        "reporter_email": (payload.reporter_email or "").strip().lower(),
     }
 
     db["complaints"].insert_one(emergency_doc)
@@ -210,6 +249,22 @@ def report_emergency(payload: EmergencyReportRequest):
         }
     )
 
+    # Notify configured admins immediately via email.
+    try:
+        send_emergency_alert_email(
+            recipients=ADMIN_ALERT_EMAILS,
+            complaint_id=complaint_id,
+            category=payload.category,
+            location_name=location_name,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            reported_at_iso=submitted_at.isoformat(),
+            image_path=file_path,
+        )
+    except Exception:
+        # Email failure should not block emergency registration.
+        pass
+
     return {
         "complaint": {
             "complaint_id": complaint_id,
@@ -222,6 +277,7 @@ def report_emergency(payload: EmergencyReportRequest):
             "longitude": payload.longitude,
             "city": city_name,
             "location_name": location_name,
+            "address": address_parts,
         },
         "status_flow": EMERGENCY_STATUS_FLOW[:3],
         "queue_bypassed": True,
@@ -234,7 +290,7 @@ def report_emergency(payload: EmergencyReportRequest):
 def send_sos(payload: SosRequest):
     complaint_id = str(uuid.uuid4())
     submitted_at = now_utc()
-    location_name, city_name = get_location_details(payload.latitude, payload.longitude)
+    location_name, city_name, address_parts = get_location_details(payload.latitude, payload.longitude)
 
     db = get_database()
     sos_doc = {
@@ -247,11 +303,14 @@ def send_sos(payload: SosRequest):
         "longitude": payload.longitude,
         "city": city_name,
         "location_name": location_name,
+        "address": address_parts,
         "short_text": payload.note,
         "status": "Reported",
+        "upvotes": 0,
         "queue_bypassed": True,
-        "created_at": submitted_at,
+        "created_at": submitted_at.isoformat(),
         "updated_at": submitted_at,
+        "reporter_email": (payload.reporter_email or "").strip().lower(),
     }
     db["complaints"].insert_one(sos_doc)
     db["admin_notifications"].insert_one(
@@ -322,6 +381,44 @@ def get_complaint(complaint_id: str):
         {"_id": 0}
     )
     return complaint
+
+
+@router.post("/complaint/{complaint_id}/upvote")
+def upvote_complaint(complaint_id: str):
+    db = get_database()
+    result = db["complaints"].find_one_and_update(
+        {"complaint_id": complaint_id},
+        {"$inc": {"upvotes": 1}},
+        return_document=ReturnDocument.AFTER,
+        projection={"_id": 0, "complaint_id": 1, "upvotes": 1},
+    )
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+
+    return {
+        "success": True,
+        "complaint_id": complaint_id,
+        "upvotes": int(result.get("upvotes", 0)),
+    }
+
+
+@router.get("/complaint/{complaint_id}/image")
+def get_complaint_image(complaint_id: str):
+    db = get_database()
+    complaint = db["complaints"].find_one(
+        {"complaint_id": complaint_id},
+        {"_id": 0, "image_path": 1},
+    )
+
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+
+    image_path = complaint.get("image_path")
+    if not image_path or not os.path.exists(image_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    return FileResponse(image_path, media_type="image/jpeg")
 
 @router.get("/download/{complaint_id}")
 def download_pdf(complaint_id: str):
@@ -408,7 +505,7 @@ def get_authority(category):
 
 
 def get_location_name(latitude, longitude):
-    location_name, _ = get_location_details(latitude, longitude)
+    location_name, _, _ = get_location_details(latitude, longitude)
     return location_name
 
 def get_location_details(latitude, longitude):
@@ -424,26 +521,56 @@ def get_location_details(latitude, longitude):
             "User-Agent": "civic-monitor-app"
         }
 
-        response = requests.get(url, params=params, headers=headers)
+        response = requests.get(url, params=params, headers=headers, timeout=5)
         data = response.json()
 
         address = data.get("address", {})
 
-        suburb = address.get("suburb") or address.get("neighbourhood")
-        city = address.get("city") or address.get("town") or address.get("village")
+        suburb = address.get("suburb")
+        neighbourhood = address.get("neighbourhood")
+        village = address.get("village")
+        town = address.get("town")
+        city = address.get("city") or town or village
         state = address.get("state")
+        country = address.get("country")
+        postcode = address.get("postcode")
 
-        parts = [suburb, city, state]
+        parts = [suburb or neighbourhood, village, town, city, state]
         location = ", ".join([p for p in parts if p])
         fallback_city = city or state or "Unknown"
 
+        address_parts = {
+            "suburb": suburb,
+            "neighbourhood": neighbourhood,
+            "village": village,
+            "town": town,
+            "city": city,
+            "state": state,
+            "country": country,
+            "postcode": postcode,
+        }
+
         return (
             location if location else f"coordinates ({latitude}, {longitude})",
-            fallback_city
+            fallback_city,
+            address_parts,
         )
 
     except Exception:
-        return (f"coordinates ({latitude}, {longitude})", "Unknown")
+        return (
+            f"coordinates ({latitude}, {longitude})",
+            "Unknown",
+            {
+                "suburb": None,
+                "neighbourhood": None,
+                "village": None,
+                "town": None,
+                "city": None,
+                "state": None,
+                "country": None,
+                "postcode": None,
+            },
+        )
 
 def get_relevant_authority(category):
 

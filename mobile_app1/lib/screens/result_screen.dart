@@ -73,11 +73,15 @@ class _ResultScreenState extends State<ResultScreen> {
               color: Colors.grey[300],
               child: imagePath.isEmpty
                   ? const Center(
-                      child: Icon(Icons.sos, size: 70, color: Color(0xFF4A148C)),
+                      child: Icon(
+                        Icons.sos,
+                        size: 70,
+                        color: Color(0xFF4A148C),
+                      ),
                     )
                   : (kIsWeb
-                      ? Image.network(imagePath, fit: BoxFit.cover)
-                      : Image.file(File(imagePath), fit: BoxFit.cover)),
+                        ? Image.network(imagePath, fit: BoxFit.cover)
+                        : Image.file(File(imagePath), fit: BoxFit.cover)),
             ),
 
             Padding(
@@ -132,13 +136,13 @@ class _ResultScreenState extends State<ResultScreen> {
                     onPressed: isEmergency
                         ? null
                         : () {
-                      // later we send edited letter to backend if needed
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Letter Submitted Successfully"),
-                        ),
-                      );
-                    },
+                            // later we send edited letter to backend if needed
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Letter Submitted Successfully"),
+                              ),
+                            );
+                          },
                     child: const Text(
                       "SUBMIT TO PORTAL",
                       style: TextStyle(
@@ -182,7 +186,9 @@ class _ResultScreenState extends State<ResultScreen> {
               ),
               const Spacer(),
               TextButton.icon(
-                onPressed: _loadingStatus ? null : () => _refreshEmergencyStatus(complaintId),
+                onPressed: _loadingStatus
+                    ? null
+                    : () => _refreshEmergencyStatus(complaintId),
                 icon: _loadingStatus
                     ? const SizedBox(
                         height: 14,
@@ -203,7 +209,10 @@ class _ResultScreenState extends State<ResultScreen> {
               final step = entry.value;
               final reached = currentIndex >= i;
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: reached ? Colors.red.shade700 : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(20),
@@ -233,9 +242,9 @@ class _ResultScreenState extends State<ResultScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status refresh failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Status refresh failed: $e')));
     } finally {
       if (mounted) setState(() => _loadingStatus = false);
     }

@@ -7,6 +7,8 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "civic_model.keras")
 
+model = tf.keras.models.load_model(MODEL_PATH)
+
 
 model = tf.keras.models.load_model(MODEL_PATH)
 

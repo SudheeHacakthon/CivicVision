@@ -21,7 +21,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     'Help Arriving',
     'Resolved',
     'Rejected',
-    'Closed'
+    'Closed',
   ];
 
   @override
@@ -63,14 +63,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _updateStatus(String complaintId, String newStatus) async {
     try {
       await ApiService.updateComplaintStatus(complaintId, newStatus);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status updated to $newStatus')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Status updated to $newStatus')));
       _loadComplaints(); // Reload the list
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update status: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
     }
   }
 
@@ -111,7 +111,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (city != null && city.trim().isNotEmpty) return city;
 
     final location =
-        complaint['location_name']?.toString() ?? complaint['location']?.toString();
+        complaint['location_name']?.toString() ??
+        complaint['location']?.toString();
     if (location != null && location.trim().isNotEmpty) {
       final parts = location
           .split(',')
@@ -201,6 +202,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Color _priorityColor(String? priority) {
+    switch (priority) {
+      case 'HIGH':
+        return Colors.red;
+      case 'MEDIUM':
+        return Colors.orange;
+      case 'LOW':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -212,222 +226,275 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : error != null
-              ? Center(child: Text('Error: $error'))
-              : complaints == null || complaints!.isEmpty
-                  ? const Center(child: Text('No complaints found'))
-                  : RefreshIndicator(
-                      onRefresh: _loadComplaints,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: complaints!.length,
-                        itemBuilder: (context, index) {
-                          final complaint = complaints![index] as Map<String, dynamic>;
-                          final complaintId = complaint['complaint_id']?.toString() ?? 'N/A';
-                          final readableId = _toReadableId(complaintId);
-                          final category = complaint['category']?.toString() ?? 'N/A';
-                          final currentStatus = complaint['status']?.toString() ?? 'Submitted';
-                          final createdAt = complaint['created_at']?.toString();
-                          final city = _cityFromComplaint(complaint);
-                          final place = _placeFromComplaint(complaint);
-                          final addressLabels = _addressLabels(complaint);
-                          final imageUrl = '${ApiService.baseUrl}/complaint/$complaintId/image';
+          ? Center(child: Text('Error: $error'))
+          : complaints == null || complaints!.isEmpty
+          ? const Center(child: Text('No complaints found'))
+          : RefreshIndicator(
+              onRefresh: _loadComplaints,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: complaints!.length,
+                itemBuilder: (context, index) {
+                  final complaint = complaints![index] as Map<String, dynamic>;
+                  final complaintId =
+                      complaint['complaint_id']?.toString() ?? 'N/A';
+                  final readableId = _toReadableId(complaintId);
+                  final category = complaint['category']?.toString() ?? 'N/A';
+                  final currentStatus =
+                      complaint['status']?.toString() ?? 'Submitted';
+                  final createdAt = complaint['created_at']?.toString();
+                  final city = _cityFromComplaint(complaint);
+                  final place = _placeFromComplaint(complaint);
+                  final addressLabels = _addressLabels(complaint);
+                  final imageUrl =
+                      '${ApiService.baseUrl}/complaint/$complaintId/image';
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (complaintId != 'N/A') ...[
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: GestureDetector(
-                                        onTap: () => _openImageZoom(imageUrl),
-                                        child: Stack(
-                                          alignment: Alignment.bottomRight,
-                                          children: [
-                                            Image.network(
-                                              imageUrl,
-                                              height: 170,
-                                              width: double.infinity,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => Container(
-                                                height: 170,
-                                                color: Colors.grey.shade100,
-                                                alignment: Alignment.center,
-                                                child: const Text('No image preview'),
-                                              ),
-                                            ),
-                                            Container(
-                                              margin: const EdgeInsets.all(8),
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black54,
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: const Text(
-                                                'Tap to zoom',
-                                                style: TextStyle(color: Colors.white, fontSize: 11),
-                                              ),
-                                            ),
-                                          ],
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (complaintId != 'N/A') ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: GestureDetector(
+                                onTap: () => _openImageZoom(imageUrl),
+                                child: Stack(
+                                  alignment: Alignment.bottomRight,
+                                  children: [
+                                    Image.network(
+                                      imageUrl,
+                                      height: 170,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        height: 170,
+                                        color: Colors.grey.shade100,
+                                        alignment: Alignment.center,
+                                        child: const Text('No image preview'),
+                                      ),
+                                    ),
+                                    Container(
+                                      margin: const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'Tap to zoom',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(height: 12),
                                   ],
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.report_problem_outlined,
-                                          color: Color(0xFF4A148C), size: 20),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          category,
-                                          style: const TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _statusColor(currentStatus).withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          currentStatus,
-                                          style: TextStyle(
-                                            color: _statusColor(currentStatus),
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.badge_outlined,
-                                          size: 18, color: Colors.black54),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'ID: $readableId',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.location_city_outlined,
-                                          size: 18, color: Colors.black54),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          '$city • ${_formatTimeAgo(createdAt)}',
-                                          style: const TextStyle(color: Colors.black54),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.place_outlined, size: 18, color: Colors.black54),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          place,
-                                          style: const TextStyle(color: Colors.black54),
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    addressLabels,
-                                    style: const TextStyle(color: Colors.black54, fontSize: 12),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.access_time, size: 18, color: Colors.black54),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          'Reported at: ${_formatAccurateTime(createdAt)}',
-                                          style: const TextStyle(color: Colors.black54),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      const Text(
-                                        'Update Status:',
-                                        style: TextStyle(fontWeight: FontWeight.w600),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      DropdownButton<String>(
-                                        value: currentStatus,
-                                        borderRadius: BorderRadius.circular(12),
-                                        items: statusOptions.map((status) {
-                                          return DropdownMenuItem<String>(
-                                            value: status,
-                                            child: Text(status),
-                                          );
-                                        }).toList(),
-                                        onChanged: (newStatus) {
-                                          if (newStatus != null &&
-                                              newStatus != currentStatus) {
-                                            _updateStatus(complaintId, newStatus);
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: TextButton.icon(
-                                      onPressed: () {
-                                        Navigator.pushNamed(
-                                          context,
-                                          '/complaint_detail',
-                                          arguments: {'complaintId': complaintId},
-                                        );
-                                      },
-                                      icon: const Icon(Icons.info_outline),
-                                      label: const Text('More details'),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
-                          );
-                        },
+                            const SizedBox(height: 12),
+                          ],
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.report_problem_outlined,
+                                color: Color(0xFF4A148C),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  category,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _statusColor(
+                                    currentStatus,
+                                  ).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  currentStatus,
+                                  style: TextStyle(
+                                    color: _statusColor(currentStatus),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _priorityColor(
+                                    complaint['priority'],
+                                  ).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  complaint['priority'] ?? 'LOW',
+                                  style: TextStyle(
+                                    color: _priorityColor(
+                                      complaint['priority'],
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.badge_outlined,
+                                size: 18,
+                                color: Colors.black54,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'ID: $readableId',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_city_outlined,
+                                size: 18,
+                                color: Colors.black54,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '$city • ${_formatTimeAgo(createdAt)}',
+                                  style: const TextStyle(color: Colors.black54),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.place_outlined,
+                                size: 18,
+                                color: Colors.black54,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  place,
+                                  style: const TextStyle(color: Colors.black54),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            addressLabels,
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time,
+                                size: 18,
+                                color: Colors.black54,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Reported at: ${_formatAccurateTime(createdAt)}',
+                                  style: const TextStyle(color: Colors.black54),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Text(
+                                'Update Status:',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(width: 12),
+                              DropdownButton<String>(
+                                value: currentStatus,
+                                borderRadius: BorderRadius.circular(12),
+                                items: statusOptions.map((status) {
+                                  return DropdownMenuItem<String>(
+                                    value: status,
+                                    child: Text(status),
+                                  );
+                                }).toList(),
+                                onChanged: (newStatus) {
+                                  if (newStatus != null &&
+                                      newStatus != currentStatus) {
+                                    _updateStatus(complaintId, newStatus);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  '/complaint_detail',
+                                  arguments: {'complaintId': complaintId},
+                                );
+                              },
+                              icon: const Icon(Icons.info_outline),
+                              label: const Text('More details'),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }
