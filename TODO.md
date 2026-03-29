@@ -1,22 +1,31 @@
-# Model Classification Report TODO - COMPLETE
+# CivicVision Auth & Reorganization TODO
+Completed: [ ]
 
-**Progress:**
-- [x] Installed scipy and scikit-learn 
-- [x] Updated train.py with sklearn classification_report on validation set after training
+## Phase 1: Flutter Frontend Setup (Auth Screens & State)
+✅ Complete
 
-**Task Complete!**
-To see the classification report:
-```
-cd backend-api/app/model/model-training && python train.py
-```
+## Phase 2: UI Reorganization
 
-This will:
-1. Train the model (10 epochs, ~minutes depending on GPU)
-2. Generate and print classification report to terminal: precision, recall, F1-score, support per class on validation set.
-3. Save updated model.
+- [x] Update mobile_app1/lib/screens/home_screen.dart (role-based cards: guest/user/admin)
 
-Classes detected from dataset: Garbage, No Issue, Pothole, Road Crack.
+- [ ] Rename/refactor complaints_screen.dart -> public_issues_screen.dart (+upvote)
+- [ ] Create my_complaints_screen.dart (user-specific)
+- [ ] Update navigation in main.dart (+ new routes)
 
-Model ready for production use in API/mobile app.
+## Phase 3: Backend Auth (FastAPI)
+- [ ] Add backend deps (bcrypt, python-jose, passlib)
+- [ ] Create backend-api/app/schemas/auth.py (AdminUser, User schemas)
+- [ ] Create backend-api/app/routes/auth.py (signup/login/OTP/forgot)
+- [ ] Update backend-api/app/database/mongodb.py (+users/admins/otps collections)
+- [ ] Update backend-api/app/main.py (+auth router, middleware)
+- [ ] Extend complaints routes (/public-issues, /upvote)
 
-No further changes needed.
+## Phase 4: Integration & Test
+- [ ] Flutter pub get && backend pip install
+- [ ] Test auth flows (admin fixed email, user OTP mock)
+- [ ] Add token guards to API calls
+- [ ] Test protected routes (public issues upvote, admin dashboard)
+- [ ] Polish: password strength, location dropdown (Nepal hardcoded), forgot pw reset
+
+**Next Step: Phase 1.1 - Update pubspec.yaml**
+
