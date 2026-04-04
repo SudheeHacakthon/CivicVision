@@ -4,11 +4,12 @@ from io import BytesIO
 from PIL import Image
 from app.database.mongodb import get_database
 from app.services.email_service import send_emergency_alert_email
-from app.services.cloudinary_service import upload_complaint_image
+from app.services.cloudinary_service import upload_complaint_image, is_cloudinary_enabled
 from datetime import datetime, timezone
 import uuid
 import os
 import math
+import logging
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -22,6 +23,7 @@ from pymongo import ReturnDocument
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 UPLOAD_FOLDER = "uploads"
 
@@ -143,7 +145,20 @@ async def predict(
     image_url = None
     try:
         image_url = upload_complaint_image(file_path, complaint_id)
-    except Exception:
+        if not image_url:
+            logger.warning(
+                "Cloudinary returned empty URL for complaint_id=%s (enabled=%s)",
+                complaint_id,
+                is_cloudinary_enabled(),
+            )
+    except Exception as exc:
+        logger.exception(
+            "Cloudinary upload failed for complaint_id=%s file=%s enabled=%s error=%s",
+            complaint_id,
+            file_path,
+            is_cloudinary_enabled(),
+            str(exc),
+        )
         # Keep local fallback when Cloudinary is not configured or upload fails.
         image_url = None
 
@@ -298,7 +313,20 @@ def report_emergency(payload: EmergencyReportRequest):
     image_url = None
     try:
         image_url = upload_complaint_image(file_path, complaint_id)
-    except Exception:
+        if not image_url:
+            logger.warning(
+                "Cloudinary returned empty URL for emergency complaint_id=%s (enabled=%s)",
+                complaint_id,
+                is_cloudinary_enabled(),
+            )
+    except Exception as exc:
+        logger.exception(
+            "Cloudinary upload failed for emergency complaint_id=%s file=%s enabled=%s error=%s",
+            complaint_id,
+            file_path,
+            is_cloudinary_enabled(),
+            str(exc),
+        )
         image_url = None
 
     location_name, city_name, address_parts = get_location_details(payload.latitude, payload.longitude)

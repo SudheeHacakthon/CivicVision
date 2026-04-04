@@ -139,6 +139,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
           '/result',
           arguments: {
             'imagePath': image.path,
+            'imageBytes': imageBytes,
             'issueType': complaint['category']?.toString() ?? "Unknown",
             'confidence': complaint['confidence']?.toString() ?? "0",
             'complaintId': complaint['complaint_id']?.toString() ?? "N/A",

@@ -128,6 +128,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         '/result',
         arguments: {
           'imagePath': image.path,
+          'imageBytes': imageBytes,
           'issueType': complaint['category']?.toString() ?? selectedCategory.label,
           'confidence': 'Critical',
           'complaintId': complaint['complaint_id']?.toString() ?? 'N/A',

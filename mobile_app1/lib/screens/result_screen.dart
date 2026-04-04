@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/api_service.dart';
 
@@ -42,6 +43,7 @@ class _ResultScreenState extends State<ResultScreen> {
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
     final imagePath = args?['imagePath']?.toString() ?? "";
+    final imageBytes = args?['imageBytes'] as Uint8List?;
     final issueType = args?['issueType']?.toString() ?? "Unknown";
     final confidence = args?['confidence']?.toString() ?? "0";
     final complaintId = args?['complaintId']?.toString() ?? "N/A";
@@ -71,7 +73,9 @@ class _ResultScreenState extends State<ResultScreen> {
               height: 300,
               width: double.infinity,
               color: Colors.grey[300],
-              child: imagePath.isEmpty
+              child: imageBytes != null
+                  ? Image.memory(imageBytes, fit: BoxFit.cover)
+                  : imagePath.isEmpty
                   ? const Center(
                       child: Icon(
                         Icons.sos,

@@ -4,28 +4,28 @@ __pycache__/
 venv/
 .venv/
 backend-api/.venv/
+
+# Environment variables (IMPORTANT)
 .env
-.venv/
+backend-api/.env
+
 # OS
 .DS_Store
 
 # Uploads
 uploads/
 
-# Flutter
-.metadata
-build/
-
-
+# ML Models
 *.pt
 *.h5
 *.pth
 
-.env
-backend-api/.env
-
+# Flutter
+.metadata
 .dart_tool/
 build/
 .idea/
 *.iml
+
+# Android
 android/local.properties
