@@ -307,7 +307,7 @@ class ApiService {
     throw Exception(
       'Could not connect to backend. Tried: ${tried.join(', ')}. '
       'If you are using a real Android phone, run with '
-      '--dart-define=API_ANDROID_DEVICE_URL=http://192.168.29.74:8000. '
+      '--dart-define=API_ANDROID_DEVICE_URL=http://172.18.90.16:8000. '
       'Last error: ${lastHttpError ?? lastNetworkError}',
     );
   }

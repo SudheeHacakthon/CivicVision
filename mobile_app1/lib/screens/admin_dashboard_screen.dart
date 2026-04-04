@@ -41,11 +41,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       sorted.sort((a, b) {
         final mapA = a as Map<String, dynamic>;
         final mapB = b as Map<String, dynamic>;
+
+        final pa = (mapA['priority_score'] ?? 0).toDouble();
+        final pb = (mapB['priority_score'] ?? 0).toDouble();
+
+        // 1️⃣ sort by priority_score
+        if (pa != pb) {
+          return pb.compareTo(pa);
+        }
+
+        // 2️⃣ if same → sort by time
         final dateA = DateTime.tryParse(mapA['created_at']?.toString() ?? '');
         final dateB = DateTime.tryParse(mapB['created_at']?.toString() ?? '');
+
         if (dateA == null && dateB == null) return 0;
         if (dateA == null) return 1;
         if (dateB == null) return -1;
+
         return dateB.compareTo(dateA);
       });
       setState(() {
@@ -215,6 +227,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Color getScoreColor(double score) {
+    if (score >= 0.7) return Colors.red;
+    if (score >= 0.4) return Colors.orange;
+    return Colors.green;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -373,6 +391,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 color: Colors.black54,
                               ),
                               const SizedBox(width: 6),
+
                               Text(
                                 'ID: $readableId',
                                 style: const TextStyle(
@@ -381,6 +400,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 ),
                               ),
                             ],
+                          ),
+
+                          const SizedBox(height: 6),
+                          Builder(
+                            builder: (context) {
+                              final score = (complaint['priority_score'] ?? 0)
+                                  .toDouble();
+                              return Row(
+                                children: [
+                                  const Icon(
+                                    Icons.analytics_outlined,
+                                    size: 18,
+                                    color: Colors.black54,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Priority Score: ${score.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: getScoreColor(score),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                           const SizedBox(height: 8),
                           Row(
