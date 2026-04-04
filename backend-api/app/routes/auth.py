@@ -13,8 +13,10 @@ from app.services.email_service import send_otp_email
 from app.database.mongodb import get_database
 from datetime import datetime, timedelta, UTC
 import random
+import logging
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 OTP_VALID_MINUTES = 10
 
@@ -112,8 +114,9 @@ async def user_signup(user: UserSignup):
 
     try:
         send_otp_email(email, otp, OTP_VALID_MINUTES)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to send OTP email")
+    except Exception as exc:
+        logger.exception("Failed to send OTP email to %s", email)
+        raise HTTPException(status_code=500, detail=f"Failed to send OTP email: {str(exc)}")
     return {"success": True, "message": "OTP sent to email"}
 
 
@@ -200,6 +203,7 @@ async def forgot_password(email: EmailStr):
 
     try:
         send_otp_email(normalized_email, otp, OTP_VALID_MINUTES)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to send OTP email")
+    except Exception as exc:
+        logger.exception("Failed to send forgot-password OTP email to %s", normalized_email)
+        raise HTTPException(status_code=500, detail=f"Failed to send OTP email: {str(exc)}")
     return {"message": "OTP sent"}

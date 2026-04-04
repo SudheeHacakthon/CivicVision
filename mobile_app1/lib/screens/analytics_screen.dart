@@ -32,7 +32,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final admin = results[1] as Map<String, dynamic>;
     final heatmap = results[2] as List<dynamic>;
 
-    final rawCategoryData = analytics['complaints_by_category'] as List<dynamic>? ?? [];
+    final rawCategoryData =
+        analytics['complaints_by_category'] as List<dynamic>? ?? [];
     final categoryData = <String, int>{};
     for (final item in rawCategoryData) {
       final row = item as Map<String, dynamic>;
@@ -42,7 +43,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
 
     final statusBreakdown =
-        admin['status_breakdown'] as Map<String, dynamic>? ?? <String, dynamic>{};
+        admin['status_breakdown'] as Map<String, dynamic>? ??
+        <String, dynamic>{};
 
     final statusData = <String, int>{
       'Submitted': (statusBreakdown['submitted'] as num?)?.toInt() ?? 0,
@@ -53,7 +55,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     };
 
     final total = (admin['total_complaints'] as num?)?.toInt() ?? 0;
-    final pending = statusData['Submitted']! +
+    final pending =
+        statusData['Submitted']! +
         statusData['In Review']! +
         statusData['In Progress']!;
     final resolved = statusData['Resolved']!;
@@ -64,10 +67,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final lat = (row['lat'] as num?)?.toDouble();
       final lng = (row['lng'] as num?)?.toDouble();
       if (lat == null || lng == null) continue;
-      points.add(MapPoint(
-        point: LatLng(lat, lng),
-        category: row['category']?.toString() ?? 'Other',
-      ));
+      points.add(
+        MapPoint(
+          point: LatLng(lat, lng),
+          category: row['category']?.toString() ?? 'Other',
+        ),
+      );
     }
 
     return _AnalyticsData(
@@ -131,7 +136,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -143,7 +151,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     required Map<String, int> data,
     required Color Function(String key) colorResolver,
   }) {
-    final sorted = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final sorted = data.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     final maxValue = sorted.isEmpty ? 1 : sorted.first.value.clamp(1, 1 << 30);
 
     return Container(
@@ -168,7 +177,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
           const SizedBox(height: 14),
           if (sorted.isEmpty)
-            const Text('No data available', style: TextStyle(color: Colors.black54))
+            const Text(
+              'No data available',
+              style: TextStyle(color: Colors.black54),
+            )
           else
             ...sorted.map((entry) {
               final color = colorResolver(entry.key);
@@ -305,7 +317,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       children: [
                         const Text(
                           'Map Visualization',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         SizedBox(
@@ -319,9 +334,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                   options: MapOptions(
                                     initialCenter: center,
                                     initialZoom: 11,
-                                    interactionOptions: const InteractionOptions(
-                                      flags: InteractiveFlag.all,
-                                    ),
+                                    interactionOptions:
+                                        const InteractionOptions(
+                                          flags: InteractiveFlag.all,
+                                        ),
                                     onPositionChanged: (position, _) {
                                       final zoom = position.zoom;
                                       if (zoom != null) {
@@ -333,7 +349,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                     TileLayer(
                                       urlTemplate:
                                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                      userAgentPackageName: 'com.civicvision.app',
+                                      userAgentPackageName:
+                                          'com.civicvision.app',
                                     ),
                                     CircleLayer(
                                       circles: data.mapPoints
@@ -341,10 +358,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                             (item) => CircleMarker(
                                               point: item.point,
                                               radius: 14,
-                                              color: _categoryColor(item.category)
-                                                  .withOpacity(0.45),
-                                              borderColor:
-                                                  _categoryColor(item.category),
+                                              color: _categoryColor(
+                                                item.category,
+                                              ).withOpacity(0.45),
+                                              borderColor: _categoryColor(
+                                                item.category,
+                                              ),
                                               borderStrokeWidth: 1.2,
                                             ),
                                           )

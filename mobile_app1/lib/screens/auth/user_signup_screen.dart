@@ -69,14 +69,18 @@ class _UserSignupScreenState extends State<UserSignupScreen> {
           _otpSent = true;
         });
       } else if (mounted) {
+        final providerError = context.read<AuthProvider>().lastError;
         setState(() {
-          _error = 'Could not send OTP. Please try again.';
+          _error =
+              (providerError != null && providerError.isNotEmpty)
+              ? providerError
+              : 'Could not send OTP. Please try again.';
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Could not send OTP. Check backend/network and try again.';
+          _error = e.toString().replaceFirst('Exception: ', '');
         });
       }
     } finally {

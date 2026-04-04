@@ -128,9 +128,9 @@ class _MapScreenState extends State<MapScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load heatmap: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load heatmap: $e')));
       }
     }
   }
@@ -178,8 +178,10 @@ class _MapScreenState extends State<MapScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 14),
-              Text('ID: ${_toReadableId(rawId)}',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                'ID: ${_toReadableId(rawId)}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
               Text('Category: ${issue['category'] ?? 'N/A'}'),
               const SizedBox(height: 8),
@@ -195,7 +197,9 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(height: 8),
               Text('Confidence: ${issue['confidence'] ?? 'N/A'}'),
               const SizedBox(height: 8),
-              Text('Reported: ${_formatTimeAgo(issue['created_at']?.toString())}'),
+              Text(
+                'Reported: ${_formatTimeAgo(issue['created_at']?.toString())}',
+              ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -234,11 +238,10 @@ class _MapScreenState extends State<MapScreen> {
 
     final bool hasPassedLocation = lat != null && lng != null;
     final LatLng centerLocation = isHeatmap && heatmapCircles.isNotEmpty
-    ? heatmapCircles.first.point
-    : hasPassedLocation
+        ? heatmapCircles.first.point
+        : hasPassedLocation
         ? LatLng(lat!, lng!)
         : (currentLocation ?? fallbackLocation);
-
 
     return Scaffold(
       appBar: AppBar(
@@ -276,7 +279,10 @@ class _MapScreenState extends State<MapScreen> {
                 MarkerLayer(
                   markers: mapIssues.map((issue) {
                     return Marker(
-                      point: LatLng(issue['lat'] as double, issue['lng'] as double),
+                      point: LatLng(
+                        issue['lat'] as double,
+                        issue['lng'] as double,
+                      ),
                       width: 40,
                       height: 40,
                       child: GestureDetector(
@@ -316,7 +322,10 @@ class _MapScreenState extends State<MapScreen> {
                   heroTag: 'zoom_in_btn',
                   onPressed: () {
                     _currentZoom += 1;
-                    _mapController.move(_mapController.camera.center, _currentZoom);
+                    _mapController.move(
+                      _mapController.camera.center,
+                      _currentZoom,
+                    );
                   },
                   child: const Icon(Icons.add),
                 ),
@@ -325,7 +334,10 @@ class _MapScreenState extends State<MapScreen> {
                   heroTag: 'zoom_out_btn',
                   onPressed: () {
                     _currentZoom -= 1;
-                    _mapController.move(_mapController.camera.center, _currentZoom);
+                    _mapController.move(
+                      _mapController.camera.center,
+                      _currentZoom,
+                    );
                   },
                   child: const Icon(Icons.remove),
                 ),

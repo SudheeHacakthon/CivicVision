@@ -4,14 +4,16 @@ from io import BytesIO
 from PIL import Image
 from app.database.mongodb import get_database
 from app.services.email_service import send_emergency_alert_email
+from app.services.cloudinary_service import upload_complaint_image
 from datetime import datetime, timezone
 import uuid
 import os
+import math
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 import requests
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -22,6 +24,43 @@ from pymongo import ReturnDocument
 router = APIRouter()
 
 UPLOAD_FOLDER = "uploads"
+
+def get_priority(category,score):
+    if score>4.0:
+        return "HIGH"
+    elif score>2.0 and score<4.0:
+        return "MEDIUM"
+    else:
+        return "LOW"
+
+def compute_priority(v, t, rho, category, confidence):
+    if category.lower() == "no issue":
+        return 0.0 if confidence < 0.8 else 0.2
+    Vmax = 100
+    rho_max = 10000
+    lambda_ = 0.1
+
+    w1, w2, w3, w4 = 0.4, 0.2, 0.2, 0.2  # weights
+
+    # U(x)
+    U = min(1, v / Vmax) * math.exp(-lambda_ * t)
+
+    # D(x)
+    D = rho / rho_max
+
+    # C(x)
+    CATEGORY_WEIGHTS = {
+        "Pothole": 0.9,
+        "Road Crack": 0.85,
+        "Garbage": 0.6,
+    }
+    C = CATEGORY_WEIGHTS.get(category, 0.5)
+
+    # Confidence (extra factor)
+    conf = confidence  # already 0–1
+
+    # Final score
+    return w1 * U + w2 * D + w3 * C + w4 * conf
 
 # Ensure uploads folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -101,11 +140,23 @@ async def predict(
     else:
         raise HTTPException(status_code=400, detail="Provide either base64 image or file upload")
 
+    image_url = None
+    try:
+        image_url = upload_complaint_image(file_path, complaint_id)
+    except Exception:
+        # Keep local fallback when Cloudinary is not configured or upload fails.
+        image_url = None
+
     from app.model.model_loader import predict_image
     prediction = predict_image(file_path)
     print("MODEL OUTPUT:", prediction)
     category = prediction["category"]
     confidence = prediction["confidence"]
+    priority = get_priority(category,confidence)
+    v = 0  # initial upvotes
+    t = 0  # newly created
+    rho = 5000  # dummy (later from API)
+    priority_score = compute_priority(v, t, rho, category, confidence)
 
     location_name, city_name, address_parts = get_location_details(latitude, longitude)
 
@@ -124,12 +175,15 @@ async def predict(
         "complaint_id": complaint_id,
         "category": category,
         "confidence": confidence,
+        "priority": priority,
+        "priority_score": priority_score,
         "latitude": latitude,
         "longitude": longitude,
         "city": city_name,
         "location_name": location_name,
         "address": address_parts,
         "image_path": file_path,
+        "image_url": image_url,
         "pdf_path": pdf_path,
         "letter": letter_text,
         "status": "Submitted",
@@ -164,9 +218,48 @@ async def predict(
 @router.get("/complaints")
 def get_all_complaints():
     db = get_database()
-    complaints = list(db["complaints"].find({}, {"_id": 0}))
-    return complaints
 
+    complaints = list(db["complaints"].find({}, {"_id": 0}))
+
+    for c in complaints:
+        v = c.get("upvotes", 0)
+        category = c.get("category")
+        raw_conf = c.get("confidence", 0)
+        conf_map = {
+            "low": 0.25,
+            "medium": 0.5,
+            "high": 0.75,
+            "critical": 1.0
+            
+        }
+        if isinstance(raw_conf, str):
+            confidence = conf_map.get(raw_conf.lower(), 0)
+            
+        else:
+            try:
+                confidence = float(raw_conf)
+                
+            except:
+                confidence = 0
+        created_at = c.get("created_at")
+
+        t = 0
+        if isinstance(created_at, str):
+            created_time = datetime.fromisoformat(created_at)
+            
+        elif isinstance(created_at, datetime):
+            created_time = created_at
+            
+        else:
+            created_time = None  # or handle properly
+
+        rho = 5000
+
+        c["priority_score"] = compute_priority(
+            v, t, rho, category, confidence
+        )
+
+    return complaints
 
 @router.get("/complaints/my")
 def get_my_complaints(email: str):
@@ -202,6 +295,12 @@ def report_emergency(payload: EmergencyReportRequest):
     file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
     image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
 
+    image_url = None
+    try:
+        image_url = upload_complaint_image(file_path, complaint_id)
+    except Exception:
+        image_url = None
+
     location_name, city_name, address_parts = get_location_details(payload.latitude, payload.longitude)
 
     db = get_database()
@@ -219,6 +318,7 @@ def report_emergency(payload: EmergencyReportRequest):
         "address": address_parts,
         "short_text": payload.short_text,
         "image_path": file_path,
+        "image_url": image_url,
         "status": "Reported",
         "upvotes": 0,
         "queue_bypassed": True,
@@ -380,16 +480,56 @@ def upvote_complaint(complaint_id: str):
         {"complaint_id": complaint_id},
         {"$inc": {"upvotes": 1}},
         return_document=ReturnDocument.AFTER,
-        projection={"_id": 0, "complaint_id": 1, "upvotes": 1},
     )
 
     if not result:
         raise HTTPException(status_code=404, detail="Complaint not found")
+    
+    new_upvotes = result.get("upvotes", 0)
+    category = result.get("category")
+    raw_conf = result.get("confidence", 0)
+    conf_map = {
+    "low": 0.25,
+    "medium": 0.5,
+    "high": 0.75,
+    "critical": 1.0
+    }
+    if isinstance(raw_conf, str):
+        confidence = conf_map.get(raw_conf.lower(), 0)
+        
+    else:
+        confidence = float(raw_conf)
+    city = result.get("city")
+    created_at = result.get("created_at")
+
+    # 3️⃣ Compute time
+    t = 0
+    if created_at:
+        created_time = datetime.fromisoformat(created_at)
+        t = (datetime.utcnow() - created_time).days
+
+    # 4️⃣ Default density
+    rho = 5000
+
+    # 5️⃣ Compute new priority ⭐
+    new_priority = compute_priority(
+        new_upvotes,
+        t,
+        rho,
+        category,
+        confidence
+    )
+
+    # 6️⃣ Update DB with new priority
+    db["complaints"].update_one(
+        {"complaint_id": complaint_id}
+    )
 
     return {
         "success": True,
         "complaint_id": complaint_id,
-        "upvotes": int(result.get("upvotes", 0)),
+        "upvotes": new_upvotes,
+        "priority_score": new_priority
     }
 
 
@@ -398,11 +538,15 @@ def get_complaint_image(complaint_id: str):
     db = get_database()
     complaint = db["complaints"].find_one(
         {"complaint_id": complaint_id},
-        {"_id": 0, "image_path": 1},
+        {"_id": 0, "image_path": 1, "image_url": 1},
     )
 
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
+
+    image_url = complaint.get("image_url")
+    if image_url:
+        return RedirectResponse(url=image_url)
 
     image_path = complaint.get("image_path")
     if not image_path or not os.path.exists(image_path):

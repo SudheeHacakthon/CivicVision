@@ -2,8 +2,10 @@
 __pycache__/
 *.pyc
 venv/
+.venv/
+backend-api/.venv/
 .env
-
+.venv/
 # OS
 .DS_Store
 
@@ -18,3 +20,12 @@ build/
 *.pt
 *.h5
 *.pth
+
+.env
+backend-api/.env
+
+.dart_tool/
+build/
+.idea/
+*.iml
+android/local.properties

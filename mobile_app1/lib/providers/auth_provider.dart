@@ -22,6 +22,26 @@ class AuthProvider extends ChangeNotifier {
     _loadFromPrefs();
   }
 
+  String _extractErrorMessage(Object error) {
+    final text = error.toString();
+    final detailKey = '"detail":"';
+    final index = text.indexOf(detailKey);
+    if (index != -1) {
+      final start = index + detailKey.length;
+      final end = text.indexOf('"', start);
+      if (end > start) {
+        final detail = text.substring(start, end).trim();
+        if (detail.isNotEmpty) return detail;
+      }
+    }
+
+    if (text.contains('Could not connect to backend')) {
+      return 'Could not connect to backend. Check API_BASE_URL / network and try again.';
+    }
+
+    return text.replaceFirst('Exception: ', '').trim();
+  }
+
   Future<void> _loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('token');
@@ -111,9 +131,15 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> userSignup(Map<String, dynamic> data) async {
     try {
+      _lastError = null;
       final res = await ApiService.userSignup(data);
-      return res['success'] == true;
-    } catch (_) {
+      final ok = res['success'] == true;
+      if (!ok) {
+        _lastError = 'Could not send OTP. Please try again.';
+      }
+      return ok;
+    } catch (e) {
+      _lastError = _extractErrorMessage(e);
       return false;
     }
   }
