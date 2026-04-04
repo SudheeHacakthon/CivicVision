@@ -66,7 +66,9 @@ class ApiService {
         );
 
         // For explicit client validation/auth failures, fail fast.
-        if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 422) {
+        if (response.statusCode == 400 ||
+            response.statusCode == 401 ||
+            response.statusCode == 422) {
           throw lastHttpError;
         }
       } on TimeoutException catch (e) {
@@ -76,7 +78,9 @@ class ApiService {
       } on Exception catch (e) {
         lastHttpError = e;
         // Continue trying other hosts only if this wasn't an explicit fail-fast client error.
-        if (e.toString().contains(' 400 ') || e.toString().contains(' 401 ') || e.toString().contains(' 422 ')) {
+        if (e.toString().contains(' 400 ') ||
+            e.toString().contains(' 401 ') ||
+            e.toString().contains(' 422 ')) {
           rethrow;
         }
       }
@@ -111,7 +115,9 @@ class ApiService {
           'Request failed at $candidate$path: ${response.statusCode} ${response.body}',
         );
 
-        if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 422) {
+        if (response.statusCode == 400 ||
+            response.statusCode == 401 ||
+            response.statusCode == 422) {
           throw lastHttpError;
         }
       } on TimeoutException catch (e) {
@@ -120,7 +126,9 @@ class ApiService {
         lastNetworkError = e;
       } on Exception catch (e) {
         lastHttpError = e;
-        if (e.toString().contains(' 400 ') || e.toString().contains(' 401 ') || e.toString().contains(' 422 ')) {
+        if (e.toString().contains(' 400 ') ||
+            e.toString().contains(' 401 ') ||
+            e.toString().contains(' 422 ')) {
           rethrow;
         }
       }
@@ -155,7 +163,9 @@ class ApiService {
           'Request failed at $candidate$path: ${response.statusCode} ${response.body}',
         );
 
-        if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 422) {
+        if (response.statusCode == 400 ||
+            response.statusCode == 401 ||
+            response.statusCode == 422) {
           throw lastHttpError;
         }
       } on TimeoutException catch (e) {
@@ -164,7 +174,9 @@ class ApiService {
         lastNetworkError = e;
       } on Exception catch (e) {
         lastHttpError = e;
-        if (e.toString().contains(' 400 ') || e.toString().contains(' 401 ') || e.toString().contains(' 422 ')) {
+        if (e.toString().contains(' 400 ') ||
+            e.toString().contains(' 401 ') ||
+            e.toString().contains(' 422 ')) {
           rethrow;
         }
       }
@@ -207,7 +219,9 @@ class ApiService {
           'Request failed at $candidate$path: ${response.statusCode} ${response.body}',
         );
 
-        if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 422) {
+        if (response.statusCode == 400 ||
+            response.statusCode == 401 ||
+            response.statusCode == 422) {
           throw lastHttpError;
         }
       } on TimeoutException catch (e) {
@@ -216,7 +230,9 @@ class ApiService {
         lastNetworkError = e;
       } on Exception catch (e) {
         lastHttpError = e;
-        if (e.toString().contains(' 400 ') || e.toString().contains(' 401 ') || e.toString().contains(' 422 ')) {
+        if (e.toString().contains(' 400 ') ||
+            e.toString().contains(' 401 ') ||
+            e.toString().contains(' 422 ')) {
           rethrow;
         }
       }
@@ -269,7 +285,9 @@ class ApiService {
           'Predict failed at $candidate/predict: ${response.statusCode} ${response.body}',
         );
 
-        if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 422) {
+        if (response.statusCode == 400 ||
+            response.statusCode == 401 ||
+            response.statusCode == 422) {
           throw lastHttpError;
         }
       } on TimeoutException catch (e) {
@@ -278,7 +296,9 @@ class ApiService {
         lastNetworkError = e;
       } on Exception catch (e) {
         lastHttpError = e;
-        if (e.toString().contains(' 400 ') || e.toString().contains(' 401 ') || e.toString().contains(' 422 ')) {
+        if (e.toString().contains(' 400 ') ||
+            e.toString().contains(' 401 ') ||
+            e.toString().contains(' 422 ')) {
           rethrow;
         }
       }
@@ -287,7 +307,7 @@ class ApiService {
     throw Exception(
       'Could not connect to backend. Tried: ${tried.join(', ')}. '
       'If you are using a real Android phone, run with '
-      '--dart-define=API_ANDROID_DEVICE_URL=http://<your-lan-ip>:8000. '
+      '--dart-define=API_ANDROID_DEVICE_URL=http://172.18.90.16:8000. '
       'Last error: ${lastHttpError ?? lastNetworkError}',
     );
   }
@@ -317,7 +337,9 @@ class ApiService {
     return _getMapWithFallback('/complaint/$complaintId');
   }
 
-  static Future<Map<String, dynamic>> upvoteComplaint(String complaintId) async {
+  static Future<Map<String, dynamic>> upvoteComplaint(
+    String complaintId,
+  ) async {
     return _postJsonWithFallback(
       '/complaint/$complaintId/upvote',
       const {},
@@ -374,12 +396,16 @@ class ApiService {
     String complaintId,
     String status,
   ) async {
-    return _putJsonWithFallback('/complaint/$complaintId/status', {'status': status});
+    return _putJsonWithFallback('/complaint/$complaintId/status', {
+      'status': status,
+    });
   }
 
   // ---------------- AUTH ----------------
 
-  static Future<Map<String, dynamic>> adminSignup(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> adminSignup(
+    Map<String, dynamic> data,
+  ) async {
     return _postJsonWithFallback(
       '/auth/admin/signup',
       data,
@@ -387,11 +413,15 @@ class ApiService {
     );
   }
 
-  static Future<Map<String, dynamic>> adminLogin(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> adminLogin(
+    Map<String, dynamic> data,
+  ) async {
     return _postJsonWithFallback('/auth/admin/login', data);
   }
 
-  static Future<Map<String, dynamic>> userSignup(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> userSignup(
+    Map<String, dynamic> data,
+  ) async {
     return _postJsonWithFallback(
       '/auth/user/signup',
       data,
@@ -399,11 +429,15 @@ class ApiService {
     );
   }
 
-  static Future<Map<String, dynamic>> verifyOtp(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> verifyOtp(
+    Map<String, dynamic> data,
+  ) async {
     return _postJsonWithFallback('/auth/verify-otp', data);
   }
 
-  static Future<Map<String, dynamic>> userLogin(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> userLogin(
+    Map<String, dynamic> data,
+  ) async {
     return _postJsonWithFallback('/auth/user/login', data);
   }
 
@@ -418,7 +452,9 @@ class ApiService {
       tried.add(candidate);
 
       try {
-        final response = await http.post(uri).timeout(const Duration(seconds: 10));
+        final response = await http
+            .post(uri)
+            .timeout(const Duration(seconds: 10));
         if (response.statusCode == 200) {
           return;
         }
@@ -469,7 +505,6 @@ class ApiService {
       );
     }
   }
-
 
   static Future<Map<String, dynamic>> triggerSos(
     double latitude,

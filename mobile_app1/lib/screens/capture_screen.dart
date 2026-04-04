@@ -14,7 +14,6 @@ class CaptureScreen extends StatefulWidget {
   State<CaptureScreen> createState() => _CaptureScreenState();
 }
 
-
 Future<Position?> _getCurrentLocation(BuildContext context) async {
   bool serviceEnabled;
   LocationPermission permission;
@@ -22,23 +21,27 @@ Future<Position?> _getCurrentLocation(BuildContext context) async {
   serviceEnabled = await Geolocator.isLocationServiceEnabled();
   if (!serviceEnabled) {
     // Show dialog to enable location
-    final shouldEnable = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Location Services Disabled'),
-        content: const Text('Enable location services for better complaint tracking with GPS?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Skip'),
+    final shouldEnable =
+        await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Location Services Disabled'),
+            content: const Text(
+              'Enable location services for better complaint tracking with GPS?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Skip'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Enable'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Enable'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
 
     if (shouldEnable) {
       await Geolocator.openLocationSettings();
@@ -58,9 +61,7 @@ Future<Position?> _getCurrentLocation(BuildContext context) async {
   }
 
   return await Geolocator.getCurrentPosition(
-    locationSettings: const LocationSettings(
-      accuracy: LocationAccuracy.high,
-    ),
+    locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
   );
 }
 
@@ -78,88 +79,90 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   Future<void> _takePictureAndTag() async {
-  if (_isProcessing ||
-      _controller == null ||
-      !_controller!.value.isInitialized) {
-    return;
-  }
+    if (_isProcessing ||
+        _controller == null ||
+        !_controller!.value.isInitialized) {
+      return;
+    }
 
-  setState(() => _isProcessing = true);
+    setState(() => _isProcessing = true);
 
-  try {
-    // 📸 Take Picture
-    final XFile image = await _controller!.takePicture();
+    try {
+      // 📸 Take Picture
+      final XFile image = await _controller!.takePicture();
 
-    // 📍 Get GPS Location (nullable)
-    final position = await _getCurrentLocation(context);
-    final lat = position?.latitude ?? 0.0;
-    final lng = position?.longitude ?? 0.0;
+      // 📍 Get GPS Location (nullable)
+      final position = await _getCurrentLocation(context);
+      final lat = position?.latitude ?? 0.0;
+      final lng = position?.longitude ?? 0.0;
 
-    if (position == null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location skipped. Complaint will be created without GPS.'),
-          duration: Duration(seconds: 3),
-        ),
+      if (position == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location skipped. Complaint will be created without GPS.',
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // Read image bytes directly from XFile to support web and mobile.
+      final imageBytes = await image.readAsBytes();
+
+      // 🤖 Call Backend API
+      final reporterEmail = context.read<AuthProvider>().email;
+      final result = await ApiService.predict(
+        imageBytes,
+        lat,
+        lng,
+        reporterEmail,
       );
+
+      print("BACKEND RESPONSE: $result");
+
+      final complaint = result['complaint'];
+
+      if (complaint == null) {
+        throw Exception(
+          "Backend error: ${result['detail'] ?? 'Complaint data is null'}",
+        );
+      }
+
+      // 🔥 Dispose camera before navigation and null it so dispose() doesn't double-free
+      await _controller?.dispose();
+      _controller = null;
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/result',
+          arguments: {
+            'imagePath': image.path,
+            'issueType': complaint['category']?.toString() ?? "Unknown",
+            'confidence': complaint['confidence']?.toString() ?? "0",
+            'complaintId': complaint['complaint_id']?.toString() ?? "N/A",
+            'letter': result['letter']?.toString() ?? "Letter not generated",
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint("Capture Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
-
-    // Read image bytes directly from XFile to support web and mobile.
-    final imageBytes = await image.readAsBytes();
-    
-    // 🤖 Call Backend API
-    final reporterEmail = context.read<AuthProvider>().email;
-    final result = await ApiService.predict(
-      imageBytes,
-      lat,
-      lng,
-      reporterEmail,
-    );
-
-    print("BACKEND RESPONSE: $result");
-
-    final complaint = result['complaint'];
-
-    if (complaint == null) {
-      throw Exception(
-          "Backend error: ${result['detail'] ?? 'Complaint data is null'}");
-    }
-
-    // 🔥 Dispose camera before navigation and null it so dispose() doesn't double-free
-    await _controller?.dispose();
-    _controller = null;
 
     if (mounted) {
-      Navigator.pushReplacementNamed(
-        context,
-        '/result',
-        arguments: {
-          'imagePath': image.path,
-          'issueType': complaint['category']?.toString() ?? "Unknown",
-          'confidence': complaint['confidence']?.toString() ?? "0",
-          'complaintId': complaint['complaint_id']?.toString() ?? "N/A",
-          'letter': result['letter']?.toString() ?? "Letter not generated",
-        },
-      );
-    }
-  } catch (e) {
-    debugPrint("Capture Error: $e");
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      setState(() => _isProcessing = false);
     }
   }
-
-  if (mounted) {
-    setState(() => _isProcessing = false);
-  }
-}
-
 
   @override
   void dispose() {

@@ -5,7 +5,7 @@ venv/
 .venv/
 backend-api/.venv/
 .env
-
+.venv/
 # OS
 .DS_Store
 
