@@ -4,6 +4,7 @@ from io import BytesIO
 from PIL import Image
 from app.database.mongodb import get_database
 from app.services.email_service import send_emergency_alert_email
+from app.services.cloudinary_service import upload_complaint_image
 from datetime import datetime, timezone
 import uuid
 import os
@@ -11,7 +12,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 import requests
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -101,6 +102,13 @@ async def predict(
     else:
         raise HTTPException(status_code=400, detail="Provide either base64 image or file upload")
 
+    image_url = None
+    try:
+        image_url = upload_complaint_image(file_path, complaint_id)
+    except Exception:
+        # Keep local fallback when Cloudinary is not configured or upload fails.
+        image_url = None
+
     from app.model.model_loader import predict_image
     prediction = predict_image(file_path)
     print("MODEL OUTPUT:", prediction)
@@ -130,6 +138,7 @@ async def predict(
         "location_name": location_name,
         "address": address_parts,
         "image_path": file_path,
+        "image_url": image_url,
         "pdf_path": pdf_path,
         "letter": letter_text,
         "status": "Submitted",
@@ -202,6 +211,12 @@ def report_emergency(payload: EmergencyReportRequest):
     file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
     image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
 
+    image_url = None
+    try:
+        image_url = upload_complaint_image(file_path, complaint_id)
+    except Exception:
+        image_url = None
+
     location_name, city_name, address_parts = get_location_details(payload.latitude, payload.longitude)
 
     db = get_database()
@@ -219,6 +234,7 @@ def report_emergency(payload: EmergencyReportRequest):
         "address": address_parts,
         "short_text": payload.short_text,
         "image_path": file_path,
+        "image_url": image_url,
         "status": "Reported",
         "upvotes": 0,
         "queue_bypassed": True,
@@ -398,11 +414,15 @@ def get_complaint_image(complaint_id: str):
     db = get_database()
     complaint = db["complaints"].find_one(
         {"complaint_id": complaint_id},
-        {"_id": 0, "image_path": 1},
+        {"_id": 0, "image_path": 1, "image_url": 1},
     )
 
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
+
+    image_url = complaint.get("image_url")
+    if image_url:
+        return RedirectResponse(url=image_url)
 
     image_path = complaint.get("image_path")
     if not image_path or not os.path.exists(image_path):
