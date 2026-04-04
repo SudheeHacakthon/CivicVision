@@ -23,3 +23,9 @@ build/
 
 .env
 backend-api/.env
+
+.dart_tool/
+build/
+.idea/
+*.iml
+android/local.properties
