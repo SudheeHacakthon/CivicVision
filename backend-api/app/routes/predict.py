@@ -534,7 +534,7 @@ def upvote_complaint(complaint_id: str):
     t = 0
     if created_at:
         created_time = datetime.fromisoformat(created_at)
-        t = (datetime.utcnow() - created_time).days
+        t = (datetime.now(timezone.utc) - created_time).days
 
     # 4️⃣ Default density
     rho = 5000
@@ -548,10 +548,7 @@ def upvote_complaint(complaint_id: str):
         confidence
     )
 
-    # 6️⃣ Update DB with new priority
-    db["complaints"].update_one(
-        {"complaint_id": complaint_id}
-    )
+
 
     return {
         "success": True,
