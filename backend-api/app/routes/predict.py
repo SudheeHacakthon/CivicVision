@@ -20,6 +20,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from pymongo import ReturnDocument
+from app.services.population_service import get_density
 
 
 router = APIRouter()
@@ -27,10 +28,10 @@ logger = logging.getLogger(__name__)
 
 UPLOAD_FOLDER = "uploads"
 
-def get_priority(category,score):
-    if score>4.0:
+def get_priority(score):
+    if score>0.7:
         return "HIGH"
-    elif score>2.0 and score<4.0:
+    elif score>=0.4:
         return "MEDIUM"
     else:
         return "LOW"
@@ -167,14 +168,13 @@ async def predict(
     print("MODEL OUTPUT:", prediction)
     category = prediction["category"]
     confidence = prediction["confidence"]
-    priority = get_priority(category,confidence)
     v = 0  # initial upvotes
     t = 0  # newly created
-    rho = 5000  # dummy (later from API)
-    priority_score = compute_priority(v, t, rho, category, confidence)
 
     location_name, city_name, address_parts = get_location_details(latitude, longitude)
-
+    rho = get_density(location_name)
+    priority_score = compute_priority(v, t, rho, category, confidence)
+    priority = get_priority(priority_score)
 
     #  generate letter with complaint_id
     letter_text = generate_complaint_letter(
@@ -268,11 +268,12 @@ def get_all_complaints():
         else:
             created_time = None  # or handle properly
 
-        rho = 5000
+        rho = get_density(c.get("location_name"))
 
         c["priority_score"] = compute_priority(
             v, t, rho, category, confidence
         )
+        c["priority"] = get_priority(c["priority_score"])
 
     return complaints
 
@@ -537,7 +538,7 @@ def upvote_complaint(complaint_id: str):
         t = (datetime.now(timezone.utc) - created_time).days
 
     # 4️⃣ Default density
-    rho = 5000
+    rho = get_density(result.get("location_name"))
 
     # 5️⃣ Compute new priority ⭐
     new_priority = compute_priority(
@@ -547,6 +548,7 @@ def upvote_complaint(complaint_id: str):
         category,
         confidence
     )
+    priority_label = get_priority(new_priority)
 
 
 
