@@ -21,6 +21,8 @@ from pydantic import BaseModel
 from typing import Optional
 from pymongo import ReturnDocument
 from app.services.population_service import get_density
+from app.data.weights import data
+from app.data.final_weights import W1, W2, W3, W4
 
 
 router = APIRouter()
@@ -36,14 +38,12 @@ def get_priority(score):
     else:
         return "LOW"
 
-def compute_priority(v, t, rho, category, confidence):
+def compute_priority(v, t, rho, category, confidence,w1,w2,w3,w4):
     if category.lower() == "no issue":
         return 0.0 if confidence < 0.8 else 0.2
     Vmax = 100
     rho_max = 10000
     lambda_ = 0.1
-
-    w1, w2, w3, w4 = 0.4, 0.2, 0.2, 0.2  # weights
 
     # U(x)
     U = min(1, v / Vmax) * math.exp(-lambda_ * t)
@@ -173,7 +173,7 @@ async def predict(
 
     location_name, city_name, address_parts = get_location_details(latitude, longitude)
     rho = get_density(location_name)
-    priority_score = compute_priority(v, t, rho, category, confidence)
+    priority_score = compute_priority(v, t, rho, category, confidence, W1, W2, W3, W4)
     priority = get_priority(priority_score)
 
     #  generate letter with complaint_id
@@ -254,7 +254,7 @@ def get_all_complaints():
             try:
                 confidence = float(raw_conf)
                 
-            except:
+            except Exception:
                 confidence = 0
         created_at = c.get("created_at")
 
@@ -271,7 +271,7 @@ def get_all_complaints():
         rho = get_density(c.get("location_name"))
 
         c["priority_score"] = compute_priority(
-            v, t, rho, category, confidence
+            v, t, rho, category, confidence, W1, W2, W3, W4
         )
         c["priority"] = get_priority(c["priority_score"])
 
