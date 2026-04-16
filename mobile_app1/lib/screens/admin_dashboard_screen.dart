@@ -12,6 +12,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<dynamic>? complaints;
   bool isLoading = true;
   String? error;
+  String _sortBy = 'Priority'; // 'Priority' or 'Time'
 
   final List<String> statusOptions = [
     'Reported',
@@ -30,36 +31,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _loadComplaints();
   }
 
+  void _sortComplaintsList(List<dynamic> list) {
+    list.sort((a, b) {
+      final mapA = a as Map<String, dynamic>;
+      final mapB = b as Map<String, dynamic>;
+
+      final dateA = DateTime.tryParse(mapA['created_at']?.toString() ?? '');
+      final dateB = DateTime.tryParse(mapB['created_at']?.toString() ?? '');
+
+      if (_sortBy == 'Time') {
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return 1;
+        if (dateB == null) return -1;
+        return dateB.compareTo(dateA);
+      } else {
+        final pa = (mapA['priority_score'] ?? 0).toDouble();
+        final pb = (mapB['priority_score'] ?? 0).toDouble();
+
+        if (pa != pb) return pb.compareTo(pa);
+
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return 1;
+        if (dateB == null) return -1;
+        return dateB.compareTo(dateA);
+      }
+    });
+  }
+
   Future<void> _loadComplaints() async {
     setState(() {
       isLoading = true;
       error = null;
     });
     try {
-      final data = await ApiService.fetchComplaints();
+      final data = await ApiService.fetchAdminComplaints();
       final sorted = List<dynamic>.from(data);
-      sorted.sort((a, b) {
-        final mapA = a as Map<String, dynamic>;
-        final mapB = b as Map<String, dynamic>;
-
-        final pa = (mapA['priority_score'] ?? 0).toDouble();
-        final pb = (mapB['priority_score'] ?? 0).toDouble();
-
-        // 1️⃣ sort by priority_score
-        if (pa != pb) {
-          return pb.compareTo(pa);
-        }
-
-        // 2️⃣ if same → sort by time
-        final dateA = DateTime.tryParse(mapA['created_at']?.toString() ?? '');
-        final dateB = DateTime.tryParse(mapB['created_at']?.toString() ?? '');
-
-        if (dateA == null && dateB == null) return 0;
-        if (dateA == null) return 1;
-        if (dateB == null) return -1;
-
-        return dateB.compareTo(dateA);
-      });
+      _sortComplaintsList(sorted);
       setState(() {
         complaints = sorted;
         isLoading = false;
@@ -84,6 +91,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
     }
+  }
+
+  void _openVerifyDialog(String complaintId) {
+    String selectedCategory = 'Pothole';
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Verify Category'),
+              content: DropdownButton<String>(
+                value: selectedCategory,
+                items: ['Pothole', 'Road Crack', 'Garbage', 'No Issue']
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) setDialogState(() => selectedCategory = val);
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    try {
+                      await ApiService.verifyComplaintCategory(
+                        complaintId,
+                        selectedCategory,
+                      );
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Verified as $selectedCategory')),
+                      );
+                      _loadComplaints();
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed: $e')),
+                      );
+                    }
+                  },
+                  child: const Text('Verify'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   String _toReadableId(String rawId) {
@@ -240,6 +300,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         title: const Text("Admin Dashboard"),
         backgroundColor: const Color(0xFF4A148C),
         foregroundColor: Colors.white,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sort by',
+            onSelected: (value) {
+              setState(() {
+                _sortBy = value;
+                if (complaints != null) {
+                  _sortComplaintsList(complaints!);
+                }
+              });
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'Priority',
+                child: Text('Sort by Priority'),
+              ),
+              const PopupMenuItem(
+                value: 'Time',
+                child: Text('Sort by Time (Newest)'),
+              ),
+            ],
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -499,22 +583,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(width: 12),
-                              DropdownButton<String>(
-                                value: currentStatus,
-                                borderRadius: BorderRadius.circular(12),
-                                items: statusOptions.map((status) {
-                                  return DropdownMenuItem<String>(
-                                    value: status,
-                                    child: Text(status),
-                                  );
-                                }).toList(),
-                                onChanged: (newStatus) {
-                                  if (newStatus != null &&
-                                      newStatus != currentStatus) {
-                                    _updateStatus(complaintId, newStatus);
-                                  }
-                                },
-                              ),
+                              if (currentStatus == 'Needs Review')
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () => _openVerifyDialog(complaintId),
+                                  child: const Text('Verify Category'),
+                                )
+                              else
+                                DropdownButton<String>(
+                                  value: currentStatus,
+                                  borderRadius: BorderRadius.circular(12),
+                                  items: statusOptions.map((status) {
+                                    return DropdownMenuItem<String>(
+                                      value: status,
+                                      child: Text(status),
+                                    );
+                                  }).toList(),
+                                  onChanged: (newStatus) {
+                                    if (newStatus != null &&
+                                        newStatus != currentStatus) {
+                                      _updateStatus(complaintId, newStatus);
+                                    }
+                                  },
+                                ),
                             ],
                           ),
                           const SizedBox(height: 6),

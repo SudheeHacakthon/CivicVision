@@ -161,6 +161,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> userLogin(String email, String password) async {
     try {
+      _lastError = null;
       final res = await ApiService.userLogin({'email': email, 'password': password});
       final token = (res['token'] ?? res['access_token']) as String?;
       final userEmail = res['email']?.toString() ?? email;
@@ -168,8 +169,15 @@ class AuthProvider extends ChangeNotifier {
         await login(token, UserRole.user, email: userEmail);
         return true;
       }
+      _lastError = 'Invalid credentials';
       return false;
-    } catch (_) {
+    } catch (e) {
+      final message = e.toString().toLowerCase();
+      if (message.contains('invalid credentials') || message.contains(' 400 ')) {
+        _lastError = 'Invalid credentials';
+      } else {
+        _lastError = _extractErrorMessage(e);
+      }
       return false;
     }
   }

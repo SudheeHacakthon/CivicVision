@@ -25,7 +25,8 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
       _isLoading = true;
       _error = null;
     });
-    final success = await context.read<AuthProvider>().userLogin(
+    final auth = context.read<AuthProvider>();
+    final success = await auth.userLogin(
       _emailController.text,
       _passwordController.text,
     );
@@ -34,7 +35,10 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
     if (success) {
       if (mounted) Navigator.pushReplacementNamed(context, '/');
     } else {
-      setState(() => _error = 'Invalid credentials');
+      setState(
+        () => _error =
+            auth.lastError ?? 'Unable to login right now. Please try again.',
+      );
     }
   }
 

@@ -73,7 +73,16 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
     if (id == null || id.isEmpty || id == 'N/A') return;
 
     try {
-      final res = await ApiService.upvoteComplaint(id);
+      final auth = context.read<AuthProvider>();
+      final email = auth.email ?? '';
+      if (email.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to upvote')),
+        );
+        return;
+      }
+      final res = await ApiService.upvoteComplaint(id, email);
       final updatedVotes = (res['upvotes'] as num?)?.toInt() ?? ((_complaints[index]['upvotes'] as num?)?.toInt() ?? 0) + 1;
       setState(() {
         _complaints[index]['upvotes'] = updatedVotes;
@@ -81,7 +90,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not upvote right now')),
+        const SnackBar(content: Text('Could not upvote right now (Maybe already upvoted)')),
       );
     }
   }
@@ -236,6 +245,22 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  if (!_isPublicScope && status.toLowerCase().contains('rejected')) ...[
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.red.shade200),
+                                      ),
+                                      child: const Text(
+                                        'Your reported issue was marked as No Issue by our reviewers.',
+                                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
                                   if (id != 'N/A') ...[
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
@@ -296,7 +321,9 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                                         decoration: BoxDecoration(
                                           color: status == 'Resolved'
                                               ? Colors.green.withOpacity(0.15)
-                                              : Colors.orange.withOpacity(0.15),
+                                              : status.toLowerCase().contains('rejected')
+                                                  ? Colors.red.withOpacity(0.15)
+                                                  : Colors.orange.withOpacity(0.15),
                                           borderRadius: BorderRadius.circular(20),
                                         ),
                                         child: Text(
@@ -304,7 +331,9 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                                           style: TextStyle(
                                             color: status == 'Resolved'
                                                 ? Colors.green.shade800
-                                                : Colors.orange.shade800,
+                                                : status.toLowerCase().contains('rejected')
+                                                    ? Colors.red.shade800
+                                                    : Colors.orange.shade800,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),

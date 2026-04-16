@@ -161,13 +161,21 @@ async def predict(
     location_name, city_name, address_parts = get_location_details(latitude, longitude)
 
 
-    #  generate letter with complaint_id
-    letter_text = generate_complaint_letter(
-        complaint_id, category, latitude, longitude, location_name, submitted_at
-    )
-
-    #  generate pdf
-    pdf_path = generate_pdf_letter(complaint_id, letter_text)
+    letter_text = None
+    pdf_path = None
+    
+    if category.lower() == "no issue" and confidence > 0.75:
+        status_val = "Rejected (Auto)"
+    elif confidence < 0.6:
+        status_val = "Needs Review"
+    else:
+        status_val = "Submitted"
+        #  generate letter with complaint_id
+        letter_text = generate_complaint_letter(
+            complaint_id, category, latitude, longitude, location_name, submitted_at
+        )
+        #  generate pdf
+        pdf_path = generate_pdf_letter(complaint_id, letter_text)
 
     db = get_database()
 
@@ -186,7 +194,7 @@ async def predict(
         "image_url": image_url,
         "pdf_path": pdf_path,
         "letter": letter_text,
-        "status": "Submitted",
+        "status": status_val,
         "upvotes": 0,
         "created_at": submitted_at.isoformat(),
         "reporter_email": (reporter_email or "").strip().lower(),
@@ -199,7 +207,7 @@ async def predict(
             "complaint_id": complaint_id,
             "category": category,
             "confidence": confidence,
-            "status": "Submitted",
+            "status": status_val,
             "submitted_at": submitted_at.isoformat()
         },
         "location": {
@@ -216,10 +224,14 @@ async def predict(
 
 
 @router.get("/complaints")
-def get_all_complaints():
+def get_all_complaints(admin: bool = False):
     db = get_database()
 
-    complaints = list(db["complaints"].find({}, {"_id": 0}))
+    if admin:
+        complaints = list(db["complaints"].find({"status": {"$ne": "Rejected (Auto)"}}, {"_id": 0}))
+    else:
+        # Public issues should not include 'Rejected' or 'Needs Review'
+        complaints = list(db["complaints"].find({"status": {"$nin": ["Rejected", "Needs Review", "Rejected (No Issue)", "Rejected (Auto)"]}}, {"_id": 0}))
 
     for c in complaints:
         v = c.get("upvotes", 0)
@@ -270,7 +282,7 @@ def get_my_complaints(email: str):
     db = get_database()
     complaints = list(
         db["complaints"].find(
-            {"reporter_email": normalized_email},
+            {"reporter_email": normalized_email, "status": {"$ne": "Rejected (Auto)"}},
             {"_id": 0},
         )
     )
@@ -473,12 +485,24 @@ def get_complaint(complaint_id: str):
     return complaint
 
 
+class UpvoteRequest(BaseModel):
+    email: str
+
 @router.post("/complaint/{complaint_id}/upvote")
-def upvote_complaint(complaint_id: str):
+def upvote_complaint(complaint_id: str, payload: UpvoteRequest):
     db = get_database()
+    email = payload.email.strip().lower()
+    
+    existing = db["complaints"].find_one({"complaint_id": complaint_id, "upvoted_by": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Already upvoted")
+
     result = db["complaints"].find_one_and_update(
         {"complaint_id": complaint_id},
-        {"$inc": {"upvotes": 1}},
+        {
+            "$inc": {"upvotes": 1},
+            "$addToSet": {"upvoted_by": email}
+        },
         return_document=ReturnDocument.AFTER,
     )
 
@@ -506,7 +530,7 @@ def upvote_complaint(complaint_id: str):
     t = 0
     if created_at:
         created_time = datetime.fromisoformat(created_at)
-        t = (datetime.utcnow() - created_time).days
+        t = (now_utc() - created_time).days
 
     # 4️⃣ Default density
     rho = 5000
@@ -522,7 +546,8 @@ def upvote_complaint(complaint_id: str):
 
     # 6️⃣ Update DB with new priority
     db["complaints"].update_one(
-        {"complaint_id": complaint_id}
+        {"complaint_id": complaint_id},
+        {"$set": {"priority_score": new_priority}}
     )
 
     return {
@@ -778,6 +803,35 @@ A Responsible Citizen
 """
 
 
+
+class AdminVerifyRequest(BaseModel):
+    category: str
+
+@router.put("/admin/verify/{complaint_id}")
+def verify_complaint(complaint_id: str, payload: AdminVerifyRequest):
+    db = get_database()
+    c = db["complaints"].find_one({"complaint_id": complaint_id})
+    if not c:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+        
+    if payload.category.lower() == "no issue":
+        db["complaints"].update_one(
+            {"complaint_id": complaint_id},
+            {"$set": {"status": "Rejected", "category": "No Issue"}}
+        )
+        return {"message": "Complaint rejected"}
+        
+    # Valid category selected by admin
+    letter_text = generate_complaint_letter(
+        complaint_id, payload.category, c.get("latitude"), c.get("longitude"), c.get("location_name"), now_utc()
+    )
+    pdf_path = generate_pdf_letter(complaint_id, letter_text)
+    
+    db["complaints"].update_one(
+        {"complaint_id": complaint_id},
+        {"$set": {"status": "Submitted", "category": payload.category, "letter": letter_text, "pdf_path": pdf_path}}
+    )
+    return {"message": "Complaint verified and made public", "pdf_download_url": f"/download/{complaint_id}"}
 
 
 class StatusUpdate(BaseModel):

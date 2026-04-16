@@ -134,6 +134,48 @@ class _CaptureScreenState extends State<CaptureScreen> {
       _controller = null;
 
       if (mounted) {
+        if (complaint['status'] == 'Rejected (Auto)') {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Column(
+                children: [
+                  Icon(Icons.check_circle_outline, color: Colors.green, size: 50),
+                  SizedBox(height: 10),
+                  Text('All Clear!', textAlign: TextAlign.center),
+                ],
+              ),
+              content: const Text(
+                "Our AI analyzed the photo and found no civic issues. Thank you for keeping the city monitored!\n\nThis report has not been submitted.",
+                textAlign: TextAlign.center,
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(120, 45),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    )
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop(); // close dialog
+                    Navigator.of(context).pop(); // close capture screen
+                  },
+                  child: const Text('Got it'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+
         Navigator.pushReplacementNamed(
           context,
           '/result',

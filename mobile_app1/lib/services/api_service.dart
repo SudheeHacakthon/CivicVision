@@ -324,6 +324,10 @@ class ApiService {
     return _getListWithFallback('/complaints');
   }
 
+  static Future<List<dynamic>> fetchAdminComplaints() async {
+    return _getListWithFallback('/complaints?admin=true');
+  }
+
   static Future<List<dynamic>> fetchMyComplaints(String email) async {
     final encoded = Uri.encodeQueryComponent(email.trim().toLowerCase());
     return _getListWithFallback('/complaints/my?email=$encoded');
@@ -339,10 +343,11 @@ class ApiService {
 
   static Future<Map<String, dynamic>> upvoteComplaint(
     String complaintId,
+    String email,
   ) async {
     return _postJsonWithFallback(
       '/complaint/$complaintId/upvote',
-      const {},
+      {'email': email},
       successStatusCodes: const {200},
     );
   }
@@ -391,6 +396,15 @@ class ApiService {
   }
 
   // ---------------- UPDATE STATUS ----------------
+
+  static Future<Map<String, dynamic>> verifyComplaintCategory(
+    String complaintId,
+    String category,
+  ) async {
+    return _putJsonWithFallback('/admin/verify/$complaintId', {
+      'category': category,
+    });
+  }
 
   static Future<Map<String, dynamic>> updateComplaintStatus(
     String complaintId,
