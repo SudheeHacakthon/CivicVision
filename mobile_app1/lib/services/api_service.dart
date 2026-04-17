@@ -5,7 +5,8 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Use --dart-define=API_BASE_URL=http://<your-ip>:8000 for real devices.
-  static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
+  // static const String _envBaseUrl = String.fromEnvironment('http://192.168.0.8:8000');
+  static const String _envBaseUrl = "http://192.168.0.10:8000";
   static const String _androidDeviceUrl = String.fromEnvironment(
     'API_ANDROID_DEVICE_URL',
     defaultValue: '',

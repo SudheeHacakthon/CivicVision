@@ -68,6 +68,21 @@ Future<Position?> _getCurrentLocation(BuildContext context) async {
 class _CaptureScreenState extends State<CaptureScreen> {
   CameraController? _controller;
   bool _isProcessing = false;
+  void showDuplicateDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text("⚠️ Issue Already Reported"),
+      content: Text("This issue is already in progress.\nYou will receive updates."),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text("OK"),
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   void initState() {
@@ -77,6 +92,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       _controller!.initialize().then((_) => setState(() {}));
     }
   }
+
 
   Future<void> _takePictureAndTag() async {
     if (_isProcessing ||
@@ -119,9 +135,26 @@ class _CaptureScreenState extends State<CaptureScreen> {
         reporterEmail,
       );
 
+      print("FULL RESPONSE: $result");
+      print("Duplicate value: ${result["duplicate"]}");
+
       print("BACKEND RESPONSE: $result");
 
+      // 🔥 HANDLE DUPLICATE FIRST
+      if (result["duplicate"] == true) {
+        showDuplicateDialog(context);
+        setState(() => _isProcessing = false);
+        return;
+      }
+
+// ✅ THEN handle normal response
       final complaint = result['complaint'];
+
+    //   if (complaint == null) {
+    //     throw Exception(
+    //     "Backend error: ${result['detail'] ?? 'Complaint data is null'}",
+    //   );
+    //  }
 
       if (complaint == null) {
         throw Exception(
@@ -144,6 +177,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
             'confidence': complaint['confidence']?.toString() ?? "0",
             'complaintId': complaint['complaint_id']?.toString() ?? "N/A",
             'letter': result['letter']?.toString() ?? "Letter not generated",
+            'imageUrl': result['image_url'],
           },
         );
       }

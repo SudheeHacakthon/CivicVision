@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 import logging
 import time
 
+
+
+
 # Load environment variables from backend-api/.env
 load_dotenv()
 
@@ -52,6 +55,7 @@ app.add_middleware(
 # Include routers
 app.include_router(predict_router)
 app.include_router(auth_router)
+
 
 # Health check route
 @app.get("/health")

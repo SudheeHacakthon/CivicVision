@@ -5,6 +5,9 @@ from PIL import Image
 from app.database.mongodb import get_database
 from app.services.email_service import send_emergency_alert_email
 from app.services.cloudinary_service import upload_complaint_image, is_cloudinary_enabled
+from app.services.email_service import send_status_update_email
+from app.services.duplicate_service import check_duplicate, get_embedding, add_embedding_to_issue
+from bson import ObjectId
 from datetime import datetime, timezone
 import uuid
 import os
@@ -21,12 +24,23 @@ from pydantic import BaseModel
 from typing import Optional
 from pymongo import ReturnDocument
 
+RADIUS_MAP = {
+    "garbage": 50,
+    "pothole": 30,
+    "road crack": 25,
+}
+
+DEFAULT_RADIUS = 35
+
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 UPLOAD_FOLDER = "uploads"
-
+def get_radius(category):
+    if not category:
+        return DEFAULT_RADIUS
+    return RADIUS_MAP.get(category.strip().lower(), DEFAULT_RADIUS)
 def get_priority(category,score):
     if score>4.0:
         return "HIGH"
@@ -52,11 +66,11 @@ def compute_priority(v, t, rho, category, confidence):
 
     # C(x)
     CATEGORY_WEIGHTS = {
-        "Pothole": 0.9,
-        "Road Crack": 0.85,
-        "Garbage": 0.6,
+        "pothole": 0.9,
+        "road crack": 0.85,
+        "garbage": 0.6,
     }
-    C = CATEGORY_WEIGHTS.get(category, 0.5)
+    C = CATEGORY_WEIGHTS.get(category.lower(), 0.5)
 
     # Confidence (extra factor)
     conf = confidence  # already 0–1
@@ -186,14 +200,52 @@ async def predict(
 
     db = get_database()
 
+    normalized_category = category.strip().lower()
+    issue_type = category.strip().title()
+    email_clean = (reporter_email or "").strip().lower()
+
+    new_embedding = get_embedding(file_path)
+
+    duplicate_result = check_duplicate(
+        db,
+        {
+            "lat": latitude,
+            "lng": longitude,
+            "type": issue_type,
+            "image_path": file_path,
+        },
+        new_embedding=new_embedding,
+    )
+
+    if duplicate_result.get("duplicate"):
+        if email_clean:
+            db["complaints"].update_one(
+                {"_id": ObjectId(duplicate_result["issue_id"])},
+                {
+                    "$addToSet": {
+                        "subscribers": email_clean
+                    }
+                }
+            )
+        add_embedding_to_issue(db, duplicate_result["issue_id"], new_embedding)
+
+        return {
+            "duplicate": True,
+            "message": "Issue already reported. You'll receive updates.",
+            "issue_id": duplicate_result["issue_id"]
+        }
+
     complaint_data = {
         "complaint_id": complaint_id,
-        "category": category,
+        "category": normalized_category,
+        "type": issue_type,
         "confidence": confidence,
         "priority": priority,
         "priority_score": priority_score,
         "latitude": latitude,
         "longitude": longitude,
+        "lat": latitude,
+        "lng": longitude,
         "city": city_name,
         "location_name": location_name,
         "address": address_parts,
@@ -204,7 +256,9 @@ async def predict(
         "status": "Submitted",
         "upvotes": 0,
         "created_at": submitted_at.isoformat(),
-        "reporter_email": (reporter_email or "").strip().lower(),
+        "reporter_email": email_clean,
+        "subscribers": [email_clean] if email_clean else [],
+        "embeddings": [new_embedding.tolist()],
     }
 
     db["complaints"].insert_one(complaint_data)
@@ -212,7 +266,7 @@ async def predict(
     return {
         "complaint": {
             "complaint_id": complaint_id,
-            "category": category,
+            "category": normalized_category,
             "confidence": confidence,
             "status": "Submitted",
             "submitted_at": submitted_at.isoformat()
@@ -534,7 +588,7 @@ def upvote_complaint(complaint_id: str):
     t = 0
     if created_at:
         created_time = datetime.fromisoformat(created_at)
-        t = (datetime.utcnow() - created_time).days
+        t = (datetime.now(timezone.utc) - created_time).days
 
     # 4️⃣ Default density
     rho = 5000
@@ -550,7 +604,8 @@ def upvote_complaint(complaint_id: str):
 
     # 6️⃣ Update DB with new priority
     db["complaints"].update_one(
-        {"complaint_id": complaint_id}
+        {"complaint_id": complaint_id},
+        {"$set": {"priority_score": new_priority}}
     )
 
     return {
@@ -574,7 +629,8 @@ def get_complaint_image(complaint_id: str):
 
     image_url = complaint.get("image_url")
     if image_url:
-        return RedirectResponse(url=image_url)
+        # return RedirectResponse(url=image_url)
+        return {"image_url": image_url}
 
     image_path = complaint.get("image_path")
     if not image_path or not os.path.exists(image_path):
@@ -842,7 +898,17 @@ def update_status(complaint_id: str, update: StatusUpdate):
 
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Complaint not found")
-
+    complaint = db["complaints"].find_one({"complaint_id": complaint_id})
+    if complaint:
+        send_status_update_email(
+            recipients=complaint.get("subscribers", []),
+            complaint_id=complaint_id,
+            new_status=update.status,
+            category=complaint.get("category"),
+            location_name=complaint.get("location_name"),
+            latitude=complaint.get("latitude"),
+            longitude=complaint.get("longitude"),
+        )
     return {
         "message": "Status updated successfully",
         "complaint_id": complaint_id,

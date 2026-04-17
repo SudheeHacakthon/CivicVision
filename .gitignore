@@ -29,3 +29,10 @@ build/
 
 # Android
 android/local.properties
+
+venv/
+venv311/
+__pycache__/
+*.pyc
+.env
+node_modules/

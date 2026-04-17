@@ -44,6 +44,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
     final imagePath = args?['imagePath']?.toString() ?? "";
     final imageBytes = args?['imageBytes'] as Uint8List?;
+    final imageUrl = args?['imageUrl']?.toString();
     final issueType = args?['issueType']?.toString() ?? "Unknown";
     final confidence = args?['confidence']?.toString() ?? "0";
     final complaintId = args?['complaintId']?.toString() ?? "N/A";
@@ -73,19 +74,41 @@ class _ResultScreenState extends State<ResultScreen> {
               height: 300,
               width: double.infinity,
               color: Colors.grey[300],
+              // child: imageBytes != null
+              //     ? Image.memory(imageBytes, fit: BoxFit.cover)
+              //     : imagePath.isEmpty
+              //     ? const Center(
+              //         child: Icon(
+              //           Icons.sos,
+              //           size: 70,
+              //           color: Color(0xFF4A148C),
+              //         ),
+              //       )
+              //     : (kIsWeb
+              //           ? Image.network(imagePath, fit: BoxFit.cover)
+              //           : Image.file(File(imagePath), fit: BoxFit.cover)),
               child: imageBytes != null
                   ? Image.memory(imageBytes, fit: BoxFit.cover)
-                  : imagePath.isEmpty
-                  ? const Center(
-                      child: Icon(
-                        Icons.sos,
-                        size: 70,
-                        color: Color(0xFF4A148C),
-                      ),
-                    )
-                  : (kIsWeb
+                  : (imageUrl != null && imageUrl.isNotEmpty)
+                  ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(child: CircularProgressIndicator());
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.broken_image, size: 50);
+                        },
+                     )
+                  : imagePath.isNotEmpty
+                    ? (kIsWeb
                         ? Image.network(imagePath, fit: BoxFit.cover)
-                        : Image.file(File(imagePath), fit: BoxFit.cover)),
+                        : Image.file(File(imagePath), fit: BoxFit.cover))
+                    : const Center(
+                       child: Icon(Icons.image_not_supported, size: 50),
+                     ),
+              
             ),
 
             Padding(
