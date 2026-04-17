@@ -14,7 +14,7 @@ dependencies:
   shared_preferences: ^2.3.2
   pin_code_fields: ^8.0.1
   google_places_flutter: ^2.0.8
-  
+
   # --- UI & Experience ---
   flutter_lucide: ^1.8.2          # Your premium icon set
 

@@ -17,6 +17,7 @@ import 'screens/auth/user_signup_screen.dart';
 import 'screens/auth/user_login_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'providers/auth_provider.dart';
+import 'providers/language_provider.dart';
 
 List<CameraDescription> globalCameras = [];
 
@@ -38,7 +39,9 @@ class AuthGate extends StatelessWidget {
     return Consumer<AuthProvider>(
       builder: (context, auth, child) {
         if (auth.isLoading) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         if (auth.isAuthenticated) {
           return const HomeScreen();
@@ -54,8 +57,13 @@ class CivicVisionApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => AuthProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(
+          create: (_) => LanguageProvider(),
+        ), // 🔥 ADD THIS
+      ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'CivicVision',

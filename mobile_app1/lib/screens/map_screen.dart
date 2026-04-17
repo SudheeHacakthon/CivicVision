@@ -240,7 +240,7 @@ class _MapScreenState extends State<MapScreen> {
     final LatLng centerLocation = isHeatmap && heatmapCircles.isNotEmpty
         ? heatmapCircles.first.point
         : hasPassedLocation
-        ? LatLng(lat!, lng!)
+        ? LatLng(lat, lng)
         : (currentLocation ?? fallbackLocation);
 
     return Scaffold(
@@ -261,9 +261,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
               onPositionChanged: (position, _) {
                 final zoom = position.zoom;
-                if (zoom != null) {
-                  _currentZoom = zoom;
-                }
+                _currentZoom = zoom;
               },
             ),
             children: [

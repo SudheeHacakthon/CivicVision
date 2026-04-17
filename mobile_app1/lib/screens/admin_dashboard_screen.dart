@@ -189,7 +189,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           child: Image.network(
             imageUrl,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const SizedBox(
+            errorBuilder: (_, _, _) => const SizedBox(
               height: 240,
               child: Center(child: Text('Unable to load image')),
             ),
@@ -291,7 +291,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       height: 170,
                                       width: double.infinity,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Container(
+                                      errorBuilder: (_, _, _) => Container(
                                         height: 170,
                                         color: Colors.grey.shade100,
                                         alignment: Alignment.center,

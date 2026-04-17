@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/api_service.dart';
+import '../services/translation_service.dart';
+import '../providers/language_provider.dart';
+import 'package:provider/provider.dart';
+import '../utils/app_translations.dart';
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({super.key});
@@ -17,18 +20,136 @@ class _ResultScreenState extends State<ResultScreen> {
   bool isEditing = false;
   String? _emergencyStatus;
   bool _loadingStatus = false;
+  String? translatedIssue;
+  String? translatedLetter;
+  bool isTranslating = true;
+  String? translatedConfidence;
+  String? lastLang;
+  String? translationError;
+  int retryCount = 0;
+  static const int maxRetries = 3;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
+    final lang = context.watch<LanguageProvider>().currentLang;
+
+    if (lastLang == lang) return; // ✅ prevent unnecessary calls
+
+    lastLang = lang;
+
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
     final letter = args?['letter']?.toString() ?? "";
-    _emergencyStatus = args?['status']?.toString();
+    final issue = args?['issueType']?.toString() ?? "";
+    final confidence = args?['confidence']?.toString() ?? "";
 
     _letterController = TextEditingController(text: letter);
+
+    _translateData(issue, letter, confidence);
+  }
+
+  Future<void> _translateData(
+    String issue,
+    String letter,
+    String confidence,
+  ) async {
+    String lang = context.read<LanguageProvider>().currentLang;
+    translationError = null;
+    retryCount = 0;
+
+    if (lang == "en") {
+      setState(() {
+        translatedIssue = issue;
+        translatedLetter = letter;
+        translatedConfidence = confidence;
+        isTranslating = false;
+      });
+      return;
+    }
+
+    setState(() => isTranslating = true);
+
+    while (retryCount < maxRetries) {
+      try {
+        print(
+          "🔄 Translation attempt ${retryCount + 1}/$maxRetries (lang: $lang)",
+        );
+
+        final tIssue = await TranslationService.translate(
+          text: issue,
+          targetLang: lang,
+        );
+        List<String> lines = letter.split("\n");
+
+        List<String> translatedLines = [];
+
+        for (String line in lines) {
+          if (line.trim().isEmpty) {
+            translatedLines.add("");
+            continue;
+          }
+
+          final tLine = await TranslationService.translate(
+            text: line,
+            targetLang: lang,
+          );
+
+          translatedLines.add(tLine);
+        }
+
+        final tLetter = translatedLines.join("\n");
+        final tConfidence = await TranslationService.translate(
+          text: confidence,
+          targetLang: lang,
+        );
+
+        setState(() {
+          translatedIssue = tIssue;
+          translatedLetter = tLetter;
+          translatedConfidence = tConfidence;
+          _letterController.text = tLetter;
+          isTranslating = false;
+          translationError = null;
+        });
+        print("🎉 Translation success!");
+        return;
+      } catch (e) {
+        retryCount++;
+        print("❌ Attempt $retryCount failed: $e");
+        if (retryCount >= maxRetries) {
+          setState(() {
+            translatedIssue = issue;
+            translatedLetter = letter;
+            translatedConfidence = confidence;
+            isTranslating = false;
+            translationError = AppTranslations.get("translation_failed", lang);
+          });
+          print("💥 All retries failed. Showing English + error.");
+        } else {
+          setState(() {
+            isTranslating = true;
+          });
+          await Future.delayed(Duration(seconds: retryCount));
+        }
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ResultScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+    final letter = args?['letter']?.toString() ?? "";
+    final issue = args?['issueType']?.toString() ?? "";
+    final confidence = args?['confidence']?.toString() ?? "";
+
+    _translateData(issue, letter, confidence);
   }
 
   @override
@@ -39,6 +160,19 @@ class _ResultScreenState extends State<ResultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String lang = context.watch<LanguageProvider>().currentLang;
+    if (lastLang != lang) {
+      lastLang = lang;
+
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+      final letter = args?['letter']?.toString() ?? "";
+      final issue = args?['issueType']?.toString() ?? "";
+      final confidence = args?['confidence']?.toString() ?? "";
+
+      _translateData(issue, letter, confidence);
+    }
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
@@ -51,7 +185,11 @@ class _ResultScreenState extends State<ResultScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEmergency ? "Emergency Report" : "AI Evaluation"),
+        title: Text(
+          isEmergency
+              ? AppTranslations.get("emergency_report", lang)
+              : AppTranslations.get("ai_evaluation", lang),
+        ),
         backgroundColor: const Color(0xFF4A148C),
         foregroundColor: Colors.white,
         actions: [
@@ -93,9 +231,22 @@ class _ResultScreenState extends State<ResultScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _infoTile("Issue Type", issueType),
-                  _infoTile("Confidence", confidence),
-                  _infoTile("Complaint ID", complaintId),
+                  _infoTile(
+                    AppTranslations.get("issue_type", lang),
+                    isTranslating
+                        ? "Translating..."
+                        : (translatedIssue ?? issueType),
+                  ),
+                  _infoTile(
+                    AppTranslations.get("confidence", lang),
+                    isTranslating
+                        ? "Translating..."
+                        : (translatedConfidence ?? confidence),
+                  ),
+                  _infoTile(
+                    AppTranslations.get("complaint_id", lang),
+                    complaintId,
+                  ),
 
                   if (isEmergency) ...[
                     const SizedBox(height: 8),
@@ -104,9 +255,12 @@ class _ResultScreenState extends State<ResultScreen> {
 
                   const SizedBox(height: 25),
 
-                  const Text(
-                    "Official Complaint Letter",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Text(
+                    AppTranslations.get("complaint_letter", lang),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
 
                   const SizedBox(height: 10),
@@ -127,7 +281,31 @@ class _ResultScreenState extends State<ResultScreen> {
                               border: InputBorder.none,
                             ),
                           )
-                        : Text(_letterController.text),
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isTranslating
+                                    ? AppTranslations.get(
+                                        "retrying_translation",
+                                        lang,
+                                      )
+                                    : (translatedLetter ??
+                                          _letterController.text),
+                              ),
+                              if (translationError != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    translationError!,
+                                    style: TextStyle(
+                                      color: Colors.orange[700],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                   ),
 
                   const SizedBox(height: 30),
@@ -142,13 +320,15 @@ class _ResultScreenState extends State<ResultScreen> {
                         : () {
                             // later we send edited letter to backend if needed
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Letter Submitted Successfully"),
+                              SnackBar(
+                                content: Text(
+                                  AppTranslations.get("letter_submitted", lang),
+                                ),
                               ),
                             );
                           },
-                    child: const Text(
-                      "SUBMIT TO PORTAL",
+                    child: Text(
+                      AppTranslations.get("submit_portal", lang),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,

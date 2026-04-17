@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -129,7 +127,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         arguments: {
           'imagePath': image.path,
           'imageBytes': imageBytes,
-          'issueType': complaint['category']?.toString() ?? selectedCategory.label,
+          'issueType':
+              complaint['category']?.toString() ?? selectedCategory.label,
           'confidence': 'Critical',
           'complaintId': complaint['complaint_id']?.toString() ?? 'N/A',
           'letter': 'Emergency alert sent to authorities.',
@@ -182,9 +181,9 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('SOS failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('SOS failed: $e')));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -229,7 +228,11 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                           ),
                           child: Column(
                             children: [
-                              Icon(category.icon, color: Colors.white, size: 34),
+                              Icon(
+                                category.icon,
+                                color: Colors.white,
+                                size: 34,
+                              ),
                               const SizedBox(height: 8),
                               Text(
                                 category.label,
@@ -310,7 +313,10 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.red.shade700,
                           borderRadius: BorderRadius.circular(24),
@@ -330,14 +336,15 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
-                    children: const [
-                      _CallChip(label: 'Ambulance 108', number: '108'),
-                      _CallChip(label: 'Fire 101', number: '101'),
-                      _CallChip(label: 'Police 100', number: '100'),
-                      _CallChip(label: 'Emergency 112', number: '112'),
-                    ].map((chip) {
-                      return _CallChipWrapper(chip: chip);
-                    }).toList(),
+                    children:
+                        const [
+                          _CallChip(label: 'Ambulance 108', number: '108'),
+                          _CallChip(label: 'Fire 101', number: '101'),
+                          _CallChip(label: 'Police 100', number: '100'),
+                          _CallChip(label: 'Emergency 112', number: '112'),
+                        ].map((chip) {
+                          return _CallChipWrapper(chip: chip);
+                        }).toList(),
                   ),
                   const Spacer(),
                   Container(
@@ -351,7 +358,10 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       children: [
                         ElevatedButton.icon(
                           onPressed: _isSubmitting ? null : _reportEmergency,
-                          icon: const Icon(Icons.warning_amber_rounded, size: 30),
+                          icon: const Icon(
+                            Icons.warning_amber_rounded,
+                            size: 30,
+                          ),
                           label: const Text(
                             'REPORT EMERGENCY',
                             style: TextStyle(

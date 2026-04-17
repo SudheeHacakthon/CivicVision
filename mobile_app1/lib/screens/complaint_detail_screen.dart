@@ -20,7 +20,8 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
   }
 
   Future<void> _loadComplaint() async {
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final complaintId = args?['complaintId']?.toString();
 
     if (complaintId == null || complaintId.isEmpty) {
@@ -91,7 +92,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
           child: Image.network(
             imageUrl,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const SizedBox(
+            errorBuilder: (_, _, _) => const SizedBox(
               height: 240,
               child: Center(child: Text('Unable to load image')),
             ),
@@ -117,9 +118,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
               '$title: ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            Expanded(
-              child: Text(value?.isNotEmpty == true ? value! : 'N/A'),
-            ),
+            Expanded(child: Text(value?.isNotEmpty == true ? value! : 'N/A')),
           ],
         ),
       ),
@@ -137,14 +136,14 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadComplaint,
-          )
+          ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
-              : _buildContent(),
+          ? Center(child: Text(_error!))
+          : _buildContent(),
     );
   }
 
@@ -158,14 +157,15 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
         ? (complaint['address'] as Map).cast<String, dynamic>()
         : <String, dynamic>{};
 
-    final locationText = complaint['location_name']?.toString() ??
+    final locationText =
+        complaint['location_name']?.toString() ??
         [
           address['suburb'],
           address['neighbourhood'],
           address['village'],
           address['town'],
           address['city'],
-          address['state']
+          address['state'],
         ].where((e) => (e?.toString().trim().isNotEmpty ?? false)).join(', ');
 
     return RefreshIndicator(
@@ -185,7 +185,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
                     height: 210,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       height: 210,
                       color: Colors.grey.shade100,
                       alignment: Alignment.center,
@@ -194,7 +194,10 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
                   ),
                   Container(
                     margin: const EdgeInsets.all(8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black54,
                       borderRadius: BorderRadius.circular(8),
@@ -215,9 +218,15 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
-                const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Status: ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: _statusColor(status),
                     borderRadius: BorderRadius.circular(20),
@@ -231,8 +240,14 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
             ),
           ),
           _infoTile('Location', locationText),
-          _infoTile('Reported Time', _formatAccurateTime(complaint['created_at']?.toString())),
-          _infoTile('Upvotes', ((complaint['upvotes'] as num?)?.toInt() ?? 0).toString()),
+          _infoTile(
+            'Reported Time',
+            _formatAccurateTime(complaint['created_at']?.toString()),
+          ),
+          _infoTile(
+            'Upvotes',
+            ((complaint['upvotes'] as num?)?.toInt() ?? 0).toString(),
+          ),
           _infoTile('Reporter', complaint['reporter_email']?.toString()),
           const SizedBox(height: 10),
           const Text(
@@ -246,7 +261,10 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(complaint['letter']?.toString() ?? 'No complaint form content available'),
+            child: Text(
+              complaint['letter']?.toString() ??
+                  'No complaint form content available',
+            ),
           ),
         ],
       ),
