@@ -22,7 +22,8 @@ from typing import Optional
 from pymongo import ReturnDocument
 from app.services.population_service import get_density
 from app.data.weights import data
-from app.data.final_weights import W1, W2, W3, W4
+from app.data.final_weights import W1, W2, W3, W4, W5
+from app.services.weights_service import get_label
 
 
 router = APIRouter()
@@ -38,12 +39,12 @@ def get_priority(score):
     else:
         return "LOW"
 
-def compute_priority(v, t, rho, category, confidence,w1,w2,w3,w4):
+def compute_priority(v, t, rho, category, confidence,w1,w2,w3,w4,w5):
     if category.lower() == "no issue":
         return 0.0 if confidence < 0.8 else 0.2
     Vmax = 100
     rho_max = 10000
-    lambda_ = 0.1
+    lambda_ = 0.15
 
     # U(x)
     U = min(1, v / Vmax) * math.exp(-lambda_ * t)
@@ -58,12 +59,22 @@ def compute_priority(v, t, rho, category, confidence,w1,w2,w3,w4):
         "Garbage": 0.6,
     }
     C = CATEGORY_WEIGHTS.get(category, 0.5)
+    #Deadline days
+    DEADLINE_MAP = {
+        "Pothole": 7,
+        "Road Crack": 10,
+        "Garbage": 2,
+    }
+    deadline_days = DEADLINE_MAP.get(category, 5)
+    # deadline pressure
+    r = max(0, deadline_days - t)
+    T = 1 - (r / deadline_days)
 
     # Confidence (extra factor)
     conf = confidence  # already 0–1
 
     # Final score
-    return w1 * U + w2 * D + w3 * C + w4 * conf
+    return w1 * U + w2 * D + w3 * C + w4 * conf + w5 * T
 
 # Ensure uploads folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -173,7 +184,7 @@ async def predict(
 
     location_name, city_name, address_parts = get_location_details(latitude, longitude)
     rho = get_density(location_name)
-    priority_score = compute_priority(v, t, rho, category, confidence, W1, W2, W3, W4)
+    priority_score = compute_priority(v, t, rho, category, confidence, W1, W2, W3, W4, W5)
     priority = get_priority(priority_score)
 
     #  generate letter with complaint_id
@@ -271,7 +282,7 @@ def get_all_complaints():
         rho = get_density(c.get("location_name"))
 
         c["priority_score"] = compute_priority(
-            v, t, rho, category, confidence, W1, W2, W3, W4
+            v, t, rho, category, confidence, W1, W2, W3, W4, W5
         )
         c["priority"] = get_priority(c["priority_score"])
 
@@ -546,7 +557,7 @@ def upvote_complaint(complaint_id: str):
         t,
         rho,
         category,
-        confidence
+        confidence, W1, W2, W3, W4, W5
     )
     priority_label = get_priority(new_priority)
 
