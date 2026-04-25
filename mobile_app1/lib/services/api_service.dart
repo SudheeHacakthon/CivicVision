@@ -11,21 +11,62 @@ class ApiService {
     defaultValue: '',
   );
 
+  static bool _isLoopbackUrl(String value) {
+    final uri = Uri.tryParse(value);
+    if (uri == null) return false;
+
+    final host = uri.host.toLowerCase();
+    return host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '10.0.2.2' ||
+        host == '::1';
+  }
+
+  static List<String> _uniqueCandidates(List<String> candidates) {
+    final seen = <String>{};
+    final unique = <String>[];
+
+    for (final candidate in candidates) {
+      if (candidate.isEmpty || seen.contains(candidate)) continue;
+      seen.add(candidate);
+      unique.add(candidate);
+    }
+
+    return unique;
+  }
+
   static List<String> _baseUrlCandidates() {
-    if (_envBaseUrl.isNotEmpty) return [_envBaseUrl];
-    if (kIsWeb) return ['http://127.0.0.1:8000'];
+    final explicitBaseUrl = _envBaseUrl.trim();
+    final androidDeviceUrl = _androidDeviceUrl.trim();
+
+    if (kIsWeb) {
+      if (explicitBaseUrl.isNotEmpty) return [explicitBaseUrl];
+      return ['http://127.0.0.1:8000'];
+    }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       final candidates = <String>[];
-      if (_androidDeviceUrl.isNotEmpty) {
-        // Real-device URL must be supplied explicitly to avoid stale LAN IP defaults.
-        candidates.add(_androidDeviceUrl);
+
+      if (explicitBaseUrl.isNotEmpty && !_isLoopbackUrl(explicitBaseUrl)) {
+        candidates.add(explicitBaseUrl);
       }
+
+      if (androidDeviceUrl.isNotEmpty) {
+        // Real-device URL must be supplied explicitly to avoid stale LAN IP defaults.
+        candidates.add(androidDeviceUrl);
+      }
+
       // Android emulator host loopback.
       candidates.add('http://10.0.2.2:8000');
-      return candidates;
+
+      if (explicitBaseUrl.isNotEmpty && _isLoopbackUrl(explicitBaseUrl)) {
+        candidates.add(explicitBaseUrl);
+      }
+
+      return _uniqueCandidates(candidates);
     }
 
+    if (explicitBaseUrl.isNotEmpty) return [explicitBaseUrl];
     return ['http://127.0.0.1:8000'];
   }
 
@@ -307,7 +348,7 @@ class ApiService {
     throw Exception(
       'Could not connect to backend. Tried: ${tried.join(', ')}. '
       'If you are using a real Android phone, run with '
-      '--dart-define=API_ANDROID_DEVICE_URL=http://172.18.90.16:8000. '
+      '--dart-define=API_ANDROID_DEVICE_URL=http://<YOUR_PC_LAN_IP>:8000. '
       'Last error: ${lastHttpError ?? lastNetworkError}',
     );
   }

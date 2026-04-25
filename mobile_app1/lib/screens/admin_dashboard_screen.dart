@@ -348,8 +348,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   final city = _cityFromComplaint(complaint);
                   final place = _placeFromComplaint(complaint);
                   final addressLabels = _addressLabels(complaint);
-                  final imageUrl =
-                      '${ApiService.baseUrl}/complaint/$complaintId/image';
+                  final rawImageUrl = complaint['image_url']?.toString();
+                  final imageUrl = (rawImageUrl != null && rawImageUrl.isNotEmpty)
+                      ? rawImageUrl
+                      : '${ApiService.baseUrl}/complaint/$complaintId/image';
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),

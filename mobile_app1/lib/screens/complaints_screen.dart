@@ -232,7 +232,11 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                           final place = _placeFromComplaint(complaint);
                           final addressLabels = _addressLabels(complaint);
                           final upvotes = (complaint['upvotes'] as num?)?.toInt() ?? 0;
-                          final imageUrl = '${ApiService.baseUrl}/complaint/$id/image';
+                          final rawImageUrl = complaint['image_url']?.toString();
+                          final imageUrl = (rawImageUrl != null && rawImageUrl.isNotEmpty)
+                              ? rawImageUrl
+                              : '${ApiService.baseUrl}/complaint/$id/image';
+
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),

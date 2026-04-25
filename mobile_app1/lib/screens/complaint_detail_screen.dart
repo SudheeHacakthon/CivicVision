@@ -152,7 +152,10 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
     final complaint = _complaintData ?? <String, dynamic>{};
     final id = complaint['complaint_id']?.toString() ?? 'N/A';
     final status = complaint['status']?.toString() ?? 'Unknown';
-    final imageUrl = '${ApiService.baseUrl}/complaint/$id/image';
+    final rawImageUrl = complaint['image_url']?.toString();
+    final imageUrl = (rawImageUrl != null && rawImageUrl.isNotEmpty)
+        ? rawImageUrl
+        : '${ApiService.baseUrl}/complaint/$id/image';
 
     final address = complaint['address'] is Map
         ? (complaint['address'] as Map).cast<String, dynamic>()

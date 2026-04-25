@@ -130,11 +130,11 @@ async def predict(
         # Decode base64
         image_data = base64.b64decode(image)
         image_pil = Image.open(BytesIO(image_data)).convert('RGB')
-        file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
+        file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg").replace('\\', '/')
         image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
     elif file:
         # Mobile fallback
-        file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
+        file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg").replace('\\', '/')
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
     else:
@@ -166,7 +166,7 @@ async def predict(
     
     if category.lower() == "no issue" and confidence > 0.75:
         status_val = "Rejected (Auto)"
-    elif confidence < 0.6:
+    elif confidence < 0.75:
         status_val = "Needs Review"
     else:
         status_val = "Submitted"
@@ -304,7 +304,7 @@ def report_emergency(payload: EmergencyReportRequest):
         raise HTTPException(status_code=400, detail="Invalid image encoding") from exc
 
     image_pil = Image.open(BytesIO(image_data)).convert("RGB")
-    file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
+    file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg").replace('\\', '/')
     image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
 
     image_url = None
@@ -574,10 +574,13 @@ def get_complaint_image(complaint_id: str):
         return RedirectResponse(url=image_url)
 
     image_path = complaint.get("image_path")
-    if not image_path or not os.path.exists(image_path):
-        raise HTTPException(status_code=404, detail="Image not found")
+    if image_path:
+        # Support both \ and / for cross-platform compatibility
+        normalized_path = image_path.replace('\\', '/')
+        if os.path.exists(normalized_path):
+            return FileResponse(normalized_path, media_type="image/jpeg")
 
-    return FileResponse(image_path, media_type="image/jpeg")
+    raise HTTPException(status_code=404, detail="Image not found")
 
 @router.get("/download/{complaint_id}")
 def download_pdf(complaint_id: str):
