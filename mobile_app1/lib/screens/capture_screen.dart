@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import 'package:geolocator/geolocator.dart';
 import '../providers/auth_provider.dart';
+import '../utils/app_translations.dart';
+import '../providers/language_provider.dart';
 
 class CaptureScreen extends StatefulWidget {
   final List<CameraDescription>? cameras;
@@ -181,6 +183,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
           '/result',
           arguments: {
             'imagePath': image.path,
+            'imageBytes': imageBytes,
             'issueType': complaint['category']?.toString() ?? "Unknown",
             'confidence': complaint['confidence']?.toString() ?? "0",
             'complaintId': complaint['complaint_id']?.toString() ?? "N/A",
@@ -249,13 +252,18 @@ class _CaptureScreenState extends State<CaptureScreen> {
               onPressed: () => Navigator.pop(context),
             ),
             if (_isProcessing)
-              const Text(
-                "AI ANALYZING...",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
+              Consumer<LanguageProvider>(
+                builder: (context, langProvider, child) {
+                  String lang = langProvider.currentLang;
+                  return Text(
+                    AppTranslations.get("ai_analyzing", lang),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  );
+                },
               ),
           ],
         ),

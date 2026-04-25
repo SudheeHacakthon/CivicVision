@@ -340,9 +340,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                         ),
                                     onPositionChanged: (position, _) {
                                       final zoom = position.zoom;
-                                      if (zoom != null) {
-                                        _mapZoom = zoom;
-                                      }
+                                      _mapZoom = zoom;
                                     },
                                   ),
                                   children: [

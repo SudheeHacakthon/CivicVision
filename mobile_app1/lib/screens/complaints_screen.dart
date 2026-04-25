@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../providers/auth_provider.dart';
+import '../utils/app_translations.dart';
+import '../providers/language_provider.dart';
 
 class ComplaintsScreen extends StatefulWidget {
   const ComplaintsScreen({super.key});
@@ -20,13 +22,12 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_initialized) return;
-
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final scope = (args?['scope']?.toString() ?? 'my').toLowerCase();
-    _isPublicScope = scope == 'public';
-    _initialized = true;
-    _loadComplaints();
+    if (!_initialized) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      _isPublicScope = args?['isPublicScope'] ?? true;
+      _loadComplaints();
+      _initialized = true;
+    }
   }
 
   Future<void> _loadComplaints() async {
@@ -36,14 +37,12 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
     });
 
     try {
-      final auth = context.read<AuthProvider>();
-      final data = _isPublicScope
+      final complaintsData = _isPublicScope
           ? await ApiService.fetchComplaints()
-          : await ApiService.fetchMyComplaints(auth.email ?? '');
+          : await ApiService.fetchMyComplaints(context.read<AuthProvider>().email ?? '');
 
-      final complaints = data
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
+      final complaints = complaintsData
+          .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
 
       complaints.sort((a, b) {
@@ -96,110 +95,85 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
   }
 
   void _openImageZoom(String imageUrl) {
-    showDialog<void>(
+    showDialog(
       context: context,
       builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.all(12),
-        child: InteractiveViewer(
-          minScale: 0.8,
-          maxScale: 4.0,
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const SizedBox(
-              height: 240,
-              child: Center(child: Text('Unable to load image')),
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (context, error, stackTrace) => const Center(
+                  child: Text('Could not load image', style: TextStyle(color: Colors.white)),
+                ),
+              ),
             ),
-          ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
         ),
       ),
     );
   }
 
   String _toReadableId(String rawId) {
-    if (rawId == 'N/A' || rawId.trim().isEmpty) return 'N/A';
-    final clean = rawId.replaceAll('-', '').toUpperCase();
-    if (clean.length >= 8) {
-      return 'CV-${clean.substring(0, 4)}-${clean.substring(clean.length - 4)}';
-    }
-    return 'CV-$clean';
+    if (rawId.length < 8) return rawId;
+    return rawId.substring(0, 8).toUpperCase();
   }
 
   String _formatTimeAgo(String? createdAtRaw) {
-    if (createdAtRaw == null || createdAtRaw.isEmpty) return 'Recently';
-    final createdAt = DateTime.tryParse(createdAtRaw);
-    if (createdAt == null) return 'Recently';
+    if (createdAtRaw == null) return 'N/A';
+    try {
+      final dt = DateTime.parse(createdAtRaw).toLocal();
+      final diff = DateTime.now().difference(dt);
 
-    final diff = DateTime.now().difference(createdAt.toLocal());
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
-    if (diff.inHours < 24) return '${diff.inHours} h ago';
-    return '${diff.inDays} d ago';
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+      return 'just now';
+    } catch (_) {
+      return 'N/A';
+    }
   }
 
   String _formatAccurateTime(String? createdAtRaw) {
-    if (createdAtRaw == null || createdAtRaw.isEmpty) return 'Unknown time';
-    final parsed = DateTime.tryParse(createdAtRaw);
-    if (parsed == null) return 'Unknown time';
-    final local = parsed.toLocal();
-
-    String two(int v) => v.toString().padLeft(2, '0');
-    return '${local.year}-${two(local.month)}-${two(local.day)} '
-        '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
+    if (createdAtRaw == null) return 'N/A';
+    try {
+      final dt = DateTime.parse(createdAtRaw).toLocal();
+      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return 'N/A';
+    }
   }
 
   String _cityFromComplaint(Map<String, dynamic> complaint) {
-    final city = complaint['city']?.toString();
-    if (city != null && city.trim().isNotEmpty) return city;
-
-    final location = complaint['location_name']?.toString() ?? complaint['location']?.toString();
-    if (location != null && location.trim().isNotEmpty) {
-      final parts = location.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      if (parts.length >= 2) return parts[1];
-      return parts.first;
-    }
-
-    return 'Unknown';
+    return complaint['city']?.toString() ?? 'Unknown City';
   }
 
   String _placeFromComplaint(Map<String, dynamic> complaint) {
-    final locationName = complaint['location_name']?.toString();
-    if (locationName != null && locationName.trim().isNotEmpty) {
-      return locationName;
-    }
-
-    final fallback = complaint['location']?.toString();
-    if (fallback != null && fallback.trim().isNotEmpty) {
-      return fallback;
-    }
-
-    return _cityFromComplaint(complaint);
+    final loc = complaint['location_name']?.toString() ?? '';
+    if (loc.isEmpty) return 'No location detail';
+    return loc;
   }
 
   String _addressLabels(Map<String, dynamic> complaint) {
-    final dynamic rawAddress = complaint['address'];
-    if (rawAddress is Map) {
-      final address = rawAddress.cast<String, dynamic>();
-      final parts = <String>[];
-
-      void addLabel(String label, String key) {
-        final value = address[key]?.toString();
-        if (value != null && value.trim().isNotEmpty) {
-          parts.add('$label: ${value.trim()}');
-        }
-      }
-
-      addLabel('Locality', 'suburb');
-      addLabel('Neighbourhood', 'neighbourhood');
-      addLabel('Village', 'village');
-      addLabel('Town', 'town');
-      addLabel('City', 'city');
-      addLabel('State', 'state');
-
-      if (parts.isNotEmpty) return parts.join(' | ');
-    }
-
-    return _placeFromComplaint(complaint);
+    final addr = complaint['address'];
+    if (addr is! Map) return '';
+    final sub = addr['suburb'] ?? addr['neighbourhood'] ?? '';
+    final state = addr['state'] ?? '';
+    final pc = addr['postcode'] ?? '';
+    return [sub, state, pc].where((e) => e.toString().isNotEmpty).join(', ');
   }
 
   @override
@@ -236,7 +210,6 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                           final imageUrl = (rawImageUrl != null && rawImageUrl.isNotEmpty)
                               ? rawImageUrl
                               : '${ApiService.baseUrl}/complaint/$id/image';
-
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
