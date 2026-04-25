@@ -113,7 +113,7 @@ class AuthProvider extends ChangeNotifier {
       });
       final token = (res['token'] ?? res['access_token']) as String?;
       if (token != null && token.isNotEmpty) {
-        await login(token, UserRole.admin);
+        await login(token, UserRole.admin, email: email);
         return true;
       }
       _lastError = 'Invalid credentials';
@@ -184,6 +184,16 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> forgotPassword(String email) async {
     await ApiService.forgotPassword(email);
+  }
+
+  Future<void> resetPassword(String email, String otp, String newPassword) async {
+    try {
+      _lastError = null;
+      await ApiService.resetPassword(email, otp, newPassword);
+    } catch (e) {
+      _lastError = _extractErrorMessage(e);
+      rethrow;
+    }
   }
 
   // Generic _authCall removed to keep per-flow parsing explicit and safer.

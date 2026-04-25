@@ -23,9 +23,17 @@ class Login(BaseModel):
     email: EmailStr
     password: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
 class OtpVerify(BaseModel):
     email: EmailStr
     otp: str
+
+class ResetPassword(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str = Field(..., min_length=8)
 
 class Token(BaseModel):
     access_token: str

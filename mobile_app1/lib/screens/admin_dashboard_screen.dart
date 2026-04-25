@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -335,9 +337,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               onRefresh: _loadComplaints,
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: complaints!.length,
+                itemCount: (complaints?.length ?? 0) + 1,
                 itemBuilder: (context, index) {
-                  final complaint = complaints![index] as Map<String, dynamic>;
+                  if (index == 0) {
+                    final adminEmail = context.read<AuthProvider>().email ?? 'Admin';
+                    final adminName = adminEmail.split('@').first;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 20, left: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Welcome, $adminName",
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF4A148C),
+                            ),
+                          ),
+                          const Text(
+                            "Here is your city's activity overview",
+                            style: TextStyle(color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final complaint = complaints![index - 1] as Map<String, dynamic>;
                   final complaintId =
                       complaint['complaint_id']?.toString() ?? 'N/A';
                   final readableId = _toReadableId(complaintId);

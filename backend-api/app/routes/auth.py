@@ -6,6 +6,8 @@ from app.schemas.auth import (
     UserSignup,
     OtpVerify,
     Login,
+    ForgotPasswordRequest,
+    ResetPassword,
     get_password_hash,
     verify_password,
 )
@@ -57,11 +59,19 @@ async def admin_signup(admin: AdminSignup):
 
 @router.post("/admin/login")
 async def admin_login(admin: AdminLogin):
-    # Validate against fixed admin credentials
     email = admin.email.strip().lower()
     password = admin.password.strip()
+    
+    # First check fixed credentials (master access)
     if email in ADMIN_CREDENTIALS and ADMIN_CREDENTIALS[email] == password:
         return {"success": True, "token": "admin_jwt_mock", "role": "admin", "email": email}
+    
+    # If not master password, check database for reset password
+    users = _collection("users")
+    user = users.find_one({"email": email, "role": "admin"})
+    if user and verify_password(password, user.get("password", "")):
+        return {"success": True, "token": "admin_jwt_mock", "role": "admin", "email": email}
+        
     raise HTTPException(status_code=400, detail="Invalid admin credentials")
 
 @router.post("/user/signup")
@@ -163,17 +173,22 @@ async def user_login(login: Login):
     users = _collection("users")
     otp_col = _collection("otp")
 
+    logger.info(f"Attempting login for: {email}")
     user = users.find_one({"email": email})
     if not user:
+        logger.warning(f"Login failed: User {email} not found")
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     otp_doc = otp_col.find_one({"email": email})
     if not otp_doc or otp_doc.get("verified") is not True:
+        logger.warning(f"Login failed: User {email} not verified")
         raise HTTPException(status_code=400, detail="Email not verified. Please complete OTP signup")
 
     if not verify_password(login.password.strip(), user.get("password", "")):
+        logger.warning(f"Login failed: Password mismatch for {email}")
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
+    logger.info(f"Login successful for: {email}")
     return {
         "success": True,
         "token": "user_jwt_mock",
@@ -183,7 +198,8 @@ async def user_login(login: Login):
 
 
 @router.post("/forgot-password")
-async def forgot_password(email: EmailStr):
+async def forgot_password(payload: ForgotPasswordRequest):
+    email = payload.email
     otp_col = _collection("otp")
     normalized_email = email.strip().lower()
     otp = ''.join(random.choices('0123456789', k=6))
@@ -207,3 +223,31 @@ async def forgot_password(email: EmailStr):
         logger.exception("Failed to send forgot-password OTP email to %s", normalized_email)
         raise HTTPException(status_code=500, detail=f"Failed to send OTP email: {str(exc)}")
     return {"message": "OTP sent"}
+
+@router.post("/reset-password")
+async def reset_password(payload: ResetPassword):
+    email = payload.email.strip().lower()
+    otp_col = _collection("otp")
+    users = _collection("users")
+
+    stored = otp_col.find_one({"email": email})
+    if not stored or stored.get("otp") != payload.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    expires_at = stored.get("expires_at")
+    if expires_at and datetime.now(UTC) > datetime.fromisoformat(expires_at):
+        raise HTTPException(status_code=400, detail="OTP expired")
+
+    # Update the user's password
+    result = users.update_one(
+        {"email": email},
+        {"$set": {"password": get_password_hash(payload.new_password.strip())}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Mark OTP as verified/used
+    otp_col.update_one({"email": email}, {"$set": {"verified": True}})
+
+    return {"success": True, "message": "Password reset successfully"}

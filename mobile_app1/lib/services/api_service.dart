@@ -361,8 +361,12 @@ class ApiService {
 
   // ---------------- COMPLAINTS ----------------
 
-  static Future<List<dynamic>> fetchComplaints() async {
-    return _getListWithFallback('/complaints');
+  static Future<List<dynamic>> fetchComplaints({double? lat, double? lng}) async {
+    String path = '/complaints';
+    if (lat != null && lng != null) {
+      path += '?lat=$lat&lng=$lng';
+    }
+    return _getListWithFallback(path);
   }
 
   static Future<List<dynamic>> fetchAdminComplaints() async {
@@ -447,6 +451,15 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> updateLetter(
+    String complaintId,
+    String letter,
+  ) async {
+    return _putJsonWithFallback('/complaint/$complaintId/letter', {
+      'letter': letter,
+    });
+  }
+
   static Future<Map<String, dynamic>> updateComplaintStatus(
     String complaintId,
     String status,
@@ -497,33 +510,9 @@ class ApiService {
   }
 
   static Future<void> forgotPassword(String email) async {
-    Object? lastNetworkError;
-    final tried = <String>[];
-
-    for (final candidate in _baseUrlCandidates()) {
-      final uri = Uri.parse(
-        '$candidate/auth/forgot-password?email=${Uri.encodeQueryComponent(email)}',
-      );
-      tried.add(candidate);
-
-      try {
-        final response = await http
-            .post(uri)
-            .timeout(const Duration(seconds: 10));
-        if (response.statusCode == 200) {
-          return;
-        }
-        throw Exception('Forgot password failed: ${response.body}');
-      } on TimeoutException catch (e) {
-        lastNetworkError = e;
-      } on http.ClientException catch (e) {
-        lastNetworkError = e;
-      }
-    }
-
-    throw Exception(
-      'Could not send OTP. Tried: ${tried.join(', ')}. Last error: $lastNetworkError',
-    );
+    await _postJsonWithFallback('/auth/forgot-password', {
+      'email': email.trim().toLowerCase(),
+    });
   }
 
   // ---------------- EMERGENCY ----------------
@@ -598,5 +587,13 @@ class ApiService {
     } else {
       throw Exception("Failed to fetch emergency status");
     }
+  }
+
+  static Future<void> resetPassword(String email, String otp, String newPassword) async {
+    await _postJsonWithFallback('/auth/reset-password', {
+      'email': email.trim().toLowerCase(),
+      'otp': otp.trim(),
+      'new_password': newPassword.trim(),
+    });
   }
 }

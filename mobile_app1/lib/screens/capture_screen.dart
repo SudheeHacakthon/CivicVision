@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
@@ -70,6 +71,7 @@ Future<Position?> _getCurrentLocation(BuildContext context) async {
 class _CaptureScreenState extends State<CaptureScreen> {
   CameraController? _controller;
   bool _isProcessing = false;
+  String? _capturedImagePath; // To show the freeze-frame
 
   @override
   void initState() {
@@ -92,6 +94,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
     try {
       // 📸 Take Picture
       final XFile image = await _controller!.takePicture();
+      setState(() {
+        _capturedImagePath = image.path;
+      });
 
       // 📍 Get GPS Location (nullable)
       final position = await _getCurrentLocation(context);
@@ -188,6 +193,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
             'confidence': complaint['confidence']?.toString() ?? "0",
             'complaintId': complaint['complaint_id']?.toString() ?? "N/A",
             'letter': result['letter']?.toString() ?? "Letter not generated",
+            'deadlineDays': result['deadline_days'] ?? 5,
           },
         );
       }
@@ -205,7 +211,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
 
     if (mounted) {
-      setState(() => _isProcessing = false);
+      setState(() {
+        _isProcessing = false;
+        _capturedImagePath = null; // Reset so they can try again if there was an error
+      });
     }
   }
 
@@ -227,7 +236,16 @@ class _CaptureScreenState extends State<CaptureScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          Center(child: CameraPreview(_controller!)),
+          Center(
+            child: _capturedImagePath != null
+                ? Image.file(
+                    File(_capturedImagePath!),
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                  )
+                : CameraPreview(_controller!),
+          ),
           _buildOverlay(),
           Positioned(
             bottom: 50,

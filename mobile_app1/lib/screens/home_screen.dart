@@ -85,16 +85,27 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  Text(
-                    auth.isAuthenticated
-                        ? AppTranslations.get("welcome", lang)
-                        : AppTranslations.get("tagline", lang),
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.purple.shade300,
-                      fontWeight: FontWeight.w500,
+                  if (auth.isAuthenticated)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        "Welcome back, ${(auth.email != null && auth.email!.contains('@')) ? auth.email!.split('@').first : 'Admin'}!",
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.purple.shade400,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  else
+                    Text(
+                      AppTranslations.get("tagline", lang),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.purple.shade300,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
 
                   const SizedBox(height: 50),
 
@@ -202,24 +213,7 @@ class HomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 40),
 
-                  /// 🗺️ MAP BUTTON
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () => Navigator.pushNamed(context, '/map'),
-                      icon: const Icon(
-                        LucideIcons.map_pin,
-                        color: Color(0xFF7B1FA2),
-                      ),
-                      label: Text(
-                        AppTranslations.get("view_map", lang),
-                        style: const TextStyle(
-                          color: Color(0xFF7B1FA2),
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 20),
 
                   const SizedBox(height: 40),
                 ],
@@ -243,7 +237,6 @@ class HomeScreen extends StatelessWidget {
     return GestureDetector(
       onTap: onTap ?? () => Navigator.pushNamed(context, route),
       child: Container(
-        height: 150,
         width: double.infinity,
         decoration: BoxDecoration(
           color: color,
@@ -273,7 +266,7 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(icon, color: Colors.white, size: 35),
-                  const Spacer(),
+                  const SizedBox(height: 15),
                   Text(
                     title,
                     style: const TextStyle(

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -21,6 +22,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
   Position? _position;
   bool _cameraReady = false;
   bool _isSubmitting = false;
+  String? _capturedImagePath; // To show the freeze-frame
 
   final List<_EmergencyCategory> _categories = const [
     _EmergencyCategory('Fire', Icons.local_fire_department, 'FIRE'),
@@ -28,6 +30,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     _EmergencyCategory('Live Wire', Icons.electrical_services, 'LIVE_WIRE'),
     _EmergencyCategory('Fallen Tree', Icons.park, 'FALLEN_TREE'),
     _EmergencyCategory('Flood / Leak', Icons.flood, 'FLOOD_WATER_LEAK'),
+    _EmergencyCategory('Other', Icons.more_horiz, 'OTHER'),
   ];
 
   @override
@@ -93,10 +96,42 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     final selectedCategory = await _showCategoryPicker();
     if (selectedCategory == null) return;
 
-    setState(() => _isSubmitting = true);
+    String? customText;
+    if (selectedCategory.apiValue == 'OTHER' && mounted) {
+      customText = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          final controller = TextEditingController();
+          return AlertDialog(
+            title: const Text('Describe Emergency'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(hintText: 'e.g. Gas leak, medical emergency...'),
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                child: const Text('Confirm'),
+              ),
+            ],
+          );
+        },
+      );
+      if (customText == null || customText.isEmpty) return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
 
     try {
       final image = await _controller!.takePicture();
+      setState(() {
+        _capturedImagePath = image.path; // Freeze the frame
+      });
+      
       final imageBytes = await image.readAsBytes();
 
       if (_position == null) {
@@ -111,7 +146,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         imageBytes,
         latitude,
         longitude,
-        selectedCategory.apiValue,
+        customText ?? selectedCategory.apiValue,
         reporterEmail: reporterEmail,
       );
 
@@ -121,7 +156,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       }
 
       if (!mounted) return;
-      Navigator.pushNamed(
+      Navigator.pushReplacementNamed(
         context,
         '/result',
         arguments: {
@@ -131,13 +166,18 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
               complaint['category']?.toString() ?? selectedCategory.label,
           'confidence': 'Critical',
           'complaintId': complaint['complaint_id']?.toString() ?? 'N/A',
-          'letter': 'Emergency alert sent to authorities.',
+          'letter': result['letter'] ?? 'Emergency alert sent to authorities.',
           'isEmergency': true,
           'status': complaint['status']?.toString() ?? 'Reported',
+          'latitude': latitude,
+          'longitude': longitude,
         },
       );
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _capturedImagePath = null; // Unfreeze on error
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Emergency submission failed: $e')),
       );
@@ -177,6 +217,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           'letter': 'SOS alert sent with live location.',
           'isEmergency': true,
           'status': complaint?['status']?.toString() ?? 'Reported',
+          'latitude': latitude,
+          'longitude': longitude,
         },
       );
     } catch (e) {
@@ -271,10 +313,16 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         children: [
           if (_cameraReady && _controller != null)
             Center(
-              child: AspectRatio(
-                aspectRatio: _controller!.value.aspectRatio,
-                child: CameraPreview(_controller!),
-              ),
+              child: _capturedImagePath != null
+                  ? Image.file(
+                      File(_capturedImagePath!),
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                    )
+                  : SizedBox.expand(
+                      child: CameraPreview(_controller!),
+                    ),
             )
           else
             Container(color: Colors.black),

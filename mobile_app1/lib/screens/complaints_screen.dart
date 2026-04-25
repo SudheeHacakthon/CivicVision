@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_translations.dart';
 import '../providers/language_provider.dart';
+import 'package:geolocator/geolocator.dart';
 
 class ComplaintsScreen extends StatefulWidget {
   const ComplaintsScreen({super.key});
@@ -18,13 +19,15 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _complaints = [];
   String? _error;
+  bool _nearMe = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      _isPublicScope = args?['isPublicScope'] ?? true;
+      final scope = args?['scope'] ?? 'public';
+      _isPublicScope = (scope == 'public');
       _loadComplaints();
       _initialized = true;
     }
@@ -37,8 +40,22 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
     });
 
     try {
+      Position? position;
+      if (_isPublicScope && _nearMe) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+          position = await Geolocator.getCurrentPosition();
+        }
+      }
+
       final complaintsData = _isPublicScope
-          ? await ApiService.fetchComplaints()
+          ? await ApiService.fetchComplaints(
+              lat: position?.latitude,
+              lng: position?.longitude,
+            )
           : await ApiService.fetchMyComplaints(context.read<AuthProvider>().email ?? '');
 
       final complaints = complaintsData
@@ -183,6 +200,30 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
         title: Text(_isPublicScope ? 'Public Issues' : 'My Complaints'),
         backgroundColor: const Color(0xFF4A148C),
         foregroundColor: Colors.white,
+        actions: [
+          if (_isPublicScope)
+            Row(
+              children: [
+                const Icon(Icons.location_on, size: 16, color: Colors.white70),
+                const SizedBox(width: 4),
+                const Text("Near Me", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                Switch(
+                  value: _nearMe,
+                  activeColor: Colors.amber,
+                  onChanged: (val) {
+                    setState(() {
+                      _nearMe = val;
+                      _loadComplaints();
+                    });
+                  },
+                ),
+              ],
+            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadComplaints,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -235,6 +276,54 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                                       child: const Text(
                                         'Your reported issue was marked as No Issue by our reviewers.',
                                         style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                  if (!_isPublicScope && status == 'Resolved') ...[
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.green.shade200),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                          SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'This issue has been resolved! Please verify the fix at the location.',
+                                              style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  if (!_isPublicScope && status == 'Needs Review') ...[
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.orange.shade200),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.hourglass_empty, color: Colors.orange, size: 20),
+                                          SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'This report is pending admin verification and is not yet public.',
+                                              style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],

@@ -49,70 +49,71 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF3E5F5),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 60),
-                Icon(LucideIcons.log_in, color: Colors.purple.shade700, size: 60),
-                const SizedBox(height: 16),
-                const Text('Admin Login', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF4A148C))),
-                Text('Team access only', style: TextStyle(fontSize: 16, color: Colors.purple.shade400)),
-                const SizedBox(height: 40),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  validator: (v) => v!.isEmpty ? 'Email required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 60),
+                  Icon(LucideIcons.log_in, color: Colors.purple.shade700, size: 60),
+                  const SizedBox(height: 16),
+                  const Text('Admin Login', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF4A148C))),
+                  Text('Team access only', style: TextStyle(fontSize: 16, color: Colors.purple.shade400)),
+                  const SizedBox(height: 40),
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                    validator: (v) => v!.isEmpty ? 'Email required' : null,
                   ),
-                  validator: (v) => v!.isEmpty ? 'Password required' : null,
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(_error!, style: TextStyle(color: Colors.red.shade600)),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    validator: (v) => v!.isEmpty ? 'Password required' : null,
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(_error!, style: TextStyle(color: Colors.red.shade600)),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _login,
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A148C)),
+                      child: _isLoading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
+                        : const Text('Login as Admin', style: TextStyle(fontSize: 18, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.pushNamed(context, '/user_login'),
+                      icon: const Icon(Icons.person_outline, color: Colors.grey),
+                      label: const Text('Login as User'),
+                    ),
+                  ),
                 ],
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A148C)),
-                    child: _isLoading 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
-                      : const Text('Login as Admin', style: TextStyle(fontSize: 18, color: Colors.white)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Spacer(),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/user_login'),
-                    icon: const Icon(Icons.person_outline, color: Colors.grey),
-                    label: const Text('Login as User'),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
