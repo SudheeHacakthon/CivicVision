@@ -1,10 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, Form, Request
+from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 import base64
 from io import BytesIO
 from PIL import Image
 from app.database.mongodb import get_database
 from app.services.email_service import send_emergency_alert_email
-from app.services.cloudinary_service import upload_complaint_image, is_cloudinary_enabled
+from app.services.cloudinary_service import upload_complaint_image
 from app.services.email_service import send_status_update_email
 from app.services.duplicate_service import check_duplicate, get_embedding, add_embedding_to_issue
 from bson import ObjectId
@@ -19,7 +19,6 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from fastapi.responses import FileResponse, RedirectResponse
 import requests
-from fastapi import HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from pymongo import ReturnDocument
@@ -37,10 +36,15 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 UPLOAD_FOLDER = "uploads"
+
+# Ensure uploads folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 def get_radius(category):
     if not category:
         return DEFAULT_RADIUS
     return RADIUS_MAP.get(category.strip().lower(), DEFAULT_RADIUS)
+
 def get_priority(category,score):
     if score>4.0:
         return "HIGH"
@@ -78,9 +82,6 @@ def compute_priority(v, t, rho, category, confidence):
     # Final score
     return w1 * U + w2 * D + w3 * C + w4 * conf
 
-# Ensure uploads folder exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 EMERGENCY_STATUS_FLOW = ["Reported", "In Progress", "Help Arriving", "Resolved", "Closed"]
 ADMIN_ALERT_EMAILS = [
     "rizwik475@gmail.com",
@@ -107,6 +108,10 @@ class SosRequest(BaseModel):
     longitude: float
     note: Optional[str] = None
     reporter_email: Optional[str] = None
+
+
+class StatusUpdate(BaseModel):
+    status: str
 
 
 @router.post("/predict")
@@ -138,7 +143,6 @@ async def predict(
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="latitude and longitude must be numbers")
     
-    # Web: base64 image, Mobile: uploaded file
     if image:
         # Support data URLs like: data:image/jpeg;base64,/9j/4AAQ...
         if "," in image:
@@ -146,60 +150,39 @@ async def predict(
         # Decode base64
         image_data = base64.b64decode(image)
         image_pil = Image.open(BytesIO(image_data)).convert('RGB')
-        file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
-        image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
     elif file:
         # Mobile fallback
-        file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
-        with open(file_path, "wb") as buffer:
-            buffer.write(await file.read())
+        image_data = await file.read()
+        image_pil = Image.open(BytesIO(image_data)).convert('RGB')
     else:
         raise HTTPException(status_code=400, detail="Provide either base64 image or file upload")
 
-    image_url = None
-    try:
-        image_url = upload_complaint_image(file_path, complaint_id)
-        if not image_url:
-            logger.warning(
-                "Cloudinary returned empty URL for complaint_id=%s (enabled=%s)",
-                complaint_id,
-                is_cloudinary_enabled(),
-            )
-    except Exception as exc:
-        logger.exception(
-            "Cloudinary upload failed for complaint_id=%s file=%s enabled=%s error=%s",
-            complaint_id,
-            file_path,
-            is_cloudinary_enabled(),
-            str(exc),
-        )
-        # Keep local fallback when Cloudinary is not configured or upload fails.
-        image_url = None
+    # Save to local file path since model prediction/embedding still uses local files
+    file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg").replace('\\', '/')
+    image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
+
+    # Upload directly to Cloudinary from memory
+    # This will raise HTTPException if upload fails, ensuring image_url is never None
+    image_url = upload_complaint_image(image_pil, complaint_id)
 
     from app.model.model_loader import predict_image
     prediction = predict_image(file_path)
-    print("MODEL OUTPUT:", prediction)
     category = prediction["category"]
     confidence = prediction["confidence"]
     priority = get_priority(category,confidence)
-    v = 0  # initial upvotes
-    t = 0  # newly created
-    rho = 5000  # dummy (later from API)
+    v = 0 
+    t = 0 
+    rho = 5000 
     priority_score = compute_priority(v, t, rho, category, confidence)
 
     location_name, city_name, address_parts = get_location_details(latitude, longitude)
 
-
-    #  generate letter with complaint_id
     letter_text = generate_complaint_letter(
         complaint_id, category, latitude, longitude, location_name, submitted_at
     )
-
-    #  generate pdf
     pdf_path = generate_pdf_letter(complaint_id, letter_text)
 
     db = get_database()
-
     normalized_category = category.strip().lower()
     issue_type = category.strip().title()
     email_clean = (reporter_email or "").strip().lower()
@@ -221,11 +204,7 @@ async def predict(
         if email_clean:
             db["complaints"].update_one(
                 {"_id": ObjectId(duplicate_result["issue_id"])},
-                {
-                    "$addToSet": {
-                        "subscribers": email_clean
-                    }
-                }
+                {"$addToSet": {"subscribers": email_clean}}
             )
         add_embedding_to_issue(db, duplicate_result["issue_id"], new_embedding)
 
@@ -287,48 +266,35 @@ async def predict(
 @router.get("/complaints")
 def get_all_complaints():
     db = get_database()
-
     complaints = list(db["complaints"].find({}, {"_id": 0}))
 
     for c in complaints:
+        
+
         v = c.get("upvotes", 0)
         category = c.get("category")
         raw_conf = c.get("confidence", 0)
-        conf_map = {
-            "low": 0.25,
-            "medium": 0.5,
-            "high": 0.75,
-            "critical": 1.0
-            
-        }
+        conf_map = {"low": 0.25, "medium": 0.5, "high": 0.75, "critical": 1.0}
+        
         if isinstance(raw_conf, str):
             confidence = conf_map.get(raw_conf.lower(), 0)
-            
         else:
             try:
                 confidence = float(raw_conf)
-                
-            except:
+            except Exception:
                 confidence = 0
+        
         created_at = c.get("created_at")
-
         t = 0
         if isinstance(created_at, str):
             created_time = datetime.fromisoformat(created_at)
-            
-        elif isinstance(created_at, datetime):
-            created_time = created_at
-            
-        else:
-            created_time = None  # or handle properly
-
+            t = (datetime.now(timezone.utc) - created_time).days
+        
         rho = 5000
-
-        c["priority_score"] = compute_priority(
-            v, t, rho, category, confidence
-        )
+        c["priority_score"] = compute_priority(v, t, rho, category, confidence)
 
     return complaints
+
 
 @router.get("/complaints/my")
 def get_my_complaints(email: str):
@@ -337,20 +303,13 @@ def get_my_complaints(email: str):
         raise HTTPException(status_code=400, detail="email is required")
 
     db = get_database()
-    complaints = list(
-        db["complaints"].find(
-            {"reporter_email": normalized_email},
-            {"_id": 0},
-        )
-    )
-    return complaints
+    return list(db["complaints"].find({"reporter_email": normalized_email}, {"_id": 0}))
 
 
 @router.post("/emergency/report")
 def report_emergency(payload: EmergencyReportRequest):
     complaint_id = str(uuid.uuid4())
     submitted_at = now_utc()
-
     image = payload.image
     if "," in image:
         image = image.split(",", 1)[1]
@@ -361,31 +320,17 @@ def report_emergency(payload: EmergencyReportRequest):
         raise HTTPException(status_code=400, detail="Invalid image encoding") from exc
 
     image_pil = Image.open(BytesIO(image_data)).convert("RGB")
-    file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg")
+    # FIX: Path normalization
+    file_path = os.path.join(UPLOAD_FOLDER, f"{complaint_id}.jpg").replace('\\', '/')
     image_pil.save(file_path, format="JPEG", quality=95, subsampling=0)
 
-    image_url = None
-    try:
-        image_url = upload_complaint_image(file_path, complaint_id)
-        if not image_url:
-            logger.warning(
-                "Cloudinary returned empty URL for emergency complaint_id=%s (enabled=%s)",
-                complaint_id,
-                is_cloudinary_enabled(),
-            )
-    except Exception as exc:
-        logger.exception(
-            "Cloudinary upload failed for emergency complaint_id=%s file=%s enabled=%s error=%s",
-            complaint_id,
-            file_path,
-            is_cloudinary_enabled(),
-            str(exc),
-        )
-        image_url = None
+    # Upload directly to Cloudinary from memory
+    # This will raise HTTPException if upload fails, ensuring image_url is never None
+    image_url = upload_complaint_image(image_pil, complaint_id)
 
     location_name, city_name, address_parts = get_location_details(payload.latitude, payload.longitude)
-
     db = get_database()
+    
     emergency_doc = {
         "complaint_id": complaint_id,
         "category": payload.category,
@@ -410,18 +355,15 @@ def report_emergency(payload: EmergencyReportRequest):
     }
 
     db["complaints"].insert_one(emergency_doc)
-    db["admin_notifications"].insert_one(
-        {
-            "complaint_id": complaint_id,
-            "kind": "EMERGENCY",
-            "priority": "CRITICAL",
-            "status": "pending",
-            "message": f"Emergency {payload.category} reported at {location_name}",
-            "created_at": submitted_at,
-        }
-    )
+    db["admin_notifications"].insert_one({
+        "complaint_id": complaint_id,
+        "kind": "EMERGENCY",
+        "priority": "CRITICAL",
+        "status": "pending",
+        "message": f"Emergency {payload.category} reported at {location_name}",
+        "created_at": submitted_at,
+    })
 
-    # Notify configured admins immediately via email.
     try:
         send_emergency_alert_email(
             recipients=ADMIN_ALERT_EMAILS,
@@ -434,7 +376,6 @@ def report_emergency(payload: EmergencyReportRequest):
             image_path=file_path,
         )
     except Exception:
-        # Email failure should not block emergency registration.
         pass
 
     return {
@@ -485,16 +426,14 @@ def send_sos(payload: SosRequest):
         "reporter_email": (payload.reporter_email or "").strip().lower(),
     }
     db["complaints"].insert_one(sos_doc)
-    db["admin_notifications"].insert_one(
-        {
-            "complaint_id": complaint_id,
-            "kind": "SOS",
-            "priority": "CRITICAL",
-            "status": "pending",
-            "message": f"SOS alert received at {location_name}",
-            "created_at": submitted_at,
-        }
-    )
+    db["admin_notifications"].insert_one({
+        "complaint_id": complaint_id,
+        "kind": "SOS",
+        "priority": "CRITICAL",
+        "status": "pending",
+        "message": f"SOS alert received at {location_name}",
+        "created_at": submitted_at,
+    })
 
     return {
         "complaint": {
@@ -517,15 +456,13 @@ def get_emergency_status(complaint_id: str):
         {"complaint_id": complaint_id, "is_emergency": True},
         {"_id": 0, "complaint_id": 1, "status": 1, "updated_at": 1, "priority": 1},
     )
-
     if not complaint:
         raise HTTPException(status_code=404, detail="Emergency complaint not found")
-
     return complaint
 
 
 @router.put("/emergency/{complaint_id}/status")
-def update_emergency_status(complaint_id: str, update: "StatusUpdate"):
+def update_emergency_status(complaint_id: str, update: StatusUpdate):
     if update.status not in EMERGENCY_STATUS_FLOW:
         raise HTTPException(status_code=400, detail="Invalid emergency status value")
 
@@ -534,7 +471,6 @@ def update_emergency_status(complaint_id: str, update: "StatusUpdate"):
         {"complaint_id": complaint_id, "is_emergency": True},
         {"$set": {"status": update.status, "updated_at": now_utc()}},
     )
-
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Emergency complaint not found")
 
@@ -548,11 +484,7 @@ def update_emergency_status(complaint_id: str, update: "StatusUpdate"):
 @router.get("/complaint/{complaint_id}")
 def get_complaint(complaint_id: str):
     db = get_database()
-    complaint = db["complaints"].find_one(
-        {"complaint_id": complaint_id},
-        {"_id": 0}
-    )
-    return complaint
+    return db["complaints"].find_one({"complaint_id": complaint_id}, {"_id": 0})
 
 
 @router.post("/complaint/{complaint_id}/upvote")
@@ -563,46 +495,28 @@ def upvote_complaint(complaint_id: str):
         {"$inc": {"upvotes": 1}},
         return_document=ReturnDocument.AFTER,
     )
-
     if not result:
         raise HTTPException(status_code=404, detail="Complaint not found")
     
     new_upvotes = result.get("upvotes", 0)
     category = result.get("category")
     raw_conf = result.get("confidence", 0)
-    conf_map = {
-    "low": 0.25,
-    "medium": 0.5,
-    "high": 0.75,
-    "critical": 1.0
-    }
+    conf_map = {"low": 0.25, "medium": 0.5, "high": 0.75, "critical": 1.0}
+    
     if isinstance(raw_conf, str):
         confidence = conf_map.get(raw_conf.lower(), 0)
-        
     else:
         confidence = float(raw_conf)
-    city = result.get("city")
+    
     created_at = result.get("created_at")
-
-    # 3️⃣ Compute time
     t = 0
     if created_at:
         created_time = datetime.fromisoformat(created_at)
         t = (datetime.now(timezone.utc) - created_time).days
 
-    # 4️⃣ Default density
     rho = 5000
+    new_priority = compute_priority(new_upvotes, t, rho, category, confidence)
 
-    # 5️⃣ Compute new priority ⭐
-    new_priority = compute_priority(
-        new_upvotes,
-        t,
-        rho,
-        category,
-        confidence
-    )
-
-    # 6️⃣ Update DB with new priority
     db["complaints"].update_one(
         {"complaint_id": complaint_id},
         {"$set": {"priority_score": new_priority}}
@@ -627,277 +541,115 @@ def get_complaint_image(complaint_id: str):
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
+    # FIX: Use RedirectResponse so the app can actually see the image
     image_url = complaint.get("image_url")
     if image_url:
-        # return RedirectResponse(url=image_url)
-        return {"image_url": image_url}
+        return RedirectResponse(url=image_url)
 
+    # FIX: Normalization for local fallback
     image_path = complaint.get("image_path")
-    if not image_path or not os.path.exists(image_path):
-        raise HTTPException(status_code=404, detail="Image not found")
+    if image_path:
+        normalized_path = image_path.replace('\\', '/')
+        if os.path.exists(normalized_path):
+            return FileResponse(normalized_path, media_type="image/jpeg")
 
-    return FileResponse(image_path, media_type="image/jpeg")
+    raise HTTPException(status_code=404, detail="Image not found")
+
 
 @router.get("/download/{complaint_id}")
 def download_pdf(complaint_id: str):
     pdf_path = f"uploads/{complaint_id}.pdf"
-
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="PDF not found")
+    return FileResponse(pdf_path, media_type="application/pdf", filename=f"{complaint_id}.pdf")
 
-    return FileResponse(
-        pdf_path,
-        media_type="application/pdf",
-        filename=f"{complaint_id}.pdf"
-    )
 
 @router.get("/admin/dashboard")
 def admin_dashboard():
     db = get_database()
-
     total = db["complaints"].count_documents({})
-    submitted = db["complaints"].count_documents({"status": "Submitted"})
-    in_review = db["complaints"].count_documents({"status": "In Review"})
-    in_progress = db["complaints"].count_documents({"status": "In Progress"})
-    reported = db["complaints"].count_documents({"status": "Reported"})
-    help_arriving = db["complaints"].count_documents({"status": "Help Arriving"})
-    resolved = db["complaints"].count_documents({"status": "Resolved"})
-    rejected = db["complaints"].count_documents({"status": "Rejected"})
-
+    def count_status(s): return db["complaints"].count_documents({"status": s})
     return {
         "total_complaints": total,
         "status_breakdown": {
-            "submitted": submitted,
-            "reported": reported,
-            "in_review": in_review,
-            "in_progress": in_progress,
-            "help_arriving": help_arriving,
-            "resolved": resolved,
-            "rejected": rejected
+            "submitted": count_status("Submitted"),
+            "reported": count_status("Reported"),
+            "in_review": count_status("In Review"),
+            "in_progress": count_status("In Progress"),
+            "help_arriving": count_status("Help Arriving"),
+            "resolved": count_status("Resolved"),
+            "rejected": count_status("Rejected")
         }
     }
+
 
 @router.get("/analytics")
 def analytics():
     db = get_database()
+    pipeline = [{"$group": {"_id": "$category", "count": {"$sum": 1}}}]
+    return {"complaints_by_category": list(db["complaints"].aggregate(pipeline))}
 
-    pipeline = [
-        {
-            "$group": {
-                "_id": "$category",
-                "count": {"$sum": 1}
-            }
-        }
-    ]
-
-    results = list(db["complaints"].aggregate(pipeline))
-
-    return {
-        "complaints_by_category": results
-    }
 
 @router.get("/heatmap")
 def get_heatmap_data():
     db = get_database()
     complaints = db["complaints"].find({}, {"_id": 0})
-
-    heatmap_data = []
-
-    for c in complaints:
-        if "latitude" in c and "longitude" in c:
-            heatmap_data.append({
-                "lat": c["latitude"],
-                "lng": c["longitude"],
-                "category": c["category"]
-            })
-
-    return heatmap_data
-
-def get_authority(category):
-    mapping = {
-        "Pothole": "Chief Engineer, Roads & Engineering Wing",
-        "Garbage Dump": "Sanitation & Solid Waste Management Department",
-        "Broken Streetlight": "Electrical & Street Lighting Wing"
-    }
-    return mapping.get(category, "Municipal Commissioner")
+    return [{"lat": c["latitude"], "lng": c["longitude"], "category": c["category"]} for c in complaints if "latitude" in c]
 
 
 def get_location_name(latitude, longitude):
     location_name, _, _ = get_location_details(latitude, longitude)
     return location_name
 
+
 def get_location_details(latitude, longitude):
     try:
         url = "https://nominatim.openstreetmap.org/reverse"
-        params = {
-            "lat": latitude,
-            "lon": longitude,
-            "format": "json"
-        }
-
-        headers = {
-            "User-Agent": "civic-monitor-app"
-        }
-
+        params = {"lat": latitude, "lon": longitude, "format": "json"}
+        headers = {"User-Agent": "civic-monitor-app"}
         response = requests.get(url, params=params, headers=headers, timeout=5)
         data = response.json()
-
         address = data.get("address", {})
-
-        suburb = address.get("suburb")
-        neighbourhood = address.get("neighbourhood")
-        village = address.get("village")
-        town = address.get("town")
-        city = address.get("city") or town or village
-        state = address.get("state")
-        country = address.get("country")
-        postcode = address.get("postcode")
-
-        parts = [suburb or neighbourhood, village, town, city, state]
+        suburb, neigh, vill, town, city, state = address.get("suburb"), address.get("neighbourhood"), address.get("village"), address.get("town"), address.get("city"), address.get("state")
+        city_final = city or town or vill
+        parts = [suburb or neigh, vill, town, city_final, state]
         location = ", ".join([p for p in parts if p])
-        fallback_city = city or state or "Unknown"
-
-        address_parts = {
-            "suburb": suburb,
-            "neighbourhood": neighbourhood,
-            "village": village,
-            "town": town,
-            "city": city,
-            "state": state,
-            "country": country,
-            "postcode": postcode,
-        }
-
-        return (
-            location if location else f"coordinates ({latitude}, {longitude})",
-            fallback_city,
-            address_parts,
-        )
-
+        return (location or f"coords ({latitude}, {longitude})", city_final or state or "Unknown", address)
     except Exception:
-        return (
-            f"coordinates ({latitude}, {longitude})",
-            "Unknown",
-            {
-                "suburb": None,
-                "neighbourhood": None,
-                "village": None,
-                "town": None,
-                "city": None,
-                "state": None,
-                "country": None,
-                "postcode": None,
-            },
-        )
+        logger.exception("Failed to get location details")
+        return (f"coords ({latitude}, {longitude})", "Unknown", {})
+
 
 def get_relevant_authority(category):
+    ghmc = "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad"
+    mapping = {
+        "Broken Streetlight": (ghmc, "Electrical & Street Lighting Wing"),
+        "Pothole": (ghmc, "Roads & Maintenance Department"),
+        "Road Crack": (ghmc, "Roads & Maintenance Department"),
+        "Garbage": (ghmc, "Sanitation & Waste Management Department")
+    }
+    return mapping.get(category, ("Municipal Corporation", "Public Works Department"))
 
-    if category == "Broken Streetlight":
-        return (
-            "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad",
-            "Electrical & Street Lighting Wing"
-        )
 
-    if category == "Pothole" or category=="Road Crack":
-        return (
-            "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad",
-            "Roads & Maintenance Department"
-        )
-
-    if category == "Garbage":
-        return (
-            "Greater Hyderabad Municipal Corporation (GHMC), Hyderabad",
-            "Sanitation & Waste Management Department"
-        )
-
-    return (
-        "Municipal Corporation",
-        "Public Works Department"
-    )
-
-def generate_complaint_letter(
-    complaint_id,
-    category,
-    latitude,
-    longitude,
-    location_name=None,
-    submitted_at=None,
-):
+def generate_complaint_letter(complaint_id, category, latitude, longitude, location_name=None, submitted_at=None):
     location_name = location_name or get_location_name(latitude, longitude)
     authority_name, department = get_relevant_authority(category)
-
     submitted_at = submitted_at or now_utc()
-    today_date = submitted_at.strftime("%d %B %Y")
-    submitted_time_utc = submitted_at.strftime("%H:%M:%S UTC")
-
-    return f"""
-Date: {today_date}
-Time: {submitted_time_utc}
-
-To,
-The Head,
-{department},
-{authority_name}.
-
-Subject: Urgent Complaint regarding {category} at {location_name} ({latitude}, {longitude})
-
-Respected Sir/Madam,
-
-I would like to formally report a civic issue identified as "{category}" at the following location:
-
-Area: {location_name}
-Latitude: {latitude}
-Longitude: {longitude}
-
-This issue is currently causing inconvenience to the public and may pose safety hazards if not addressed promptly.
-
-I request the concerned department to kindly inspect and resolve the matter at the earliest.
-
-Complaint Reference ID: {complaint_id}
-
-Thanking you.
-
-Sincerely,
-A Responsible Citizen
-"""
-
-
-
-
-class StatusUpdate(BaseModel):
-    status: str
+    today, time_utc = submitted_at.strftime("%d %B %Y"), submitted_at.strftime("%H:%M:%S UTC")
+    return f"Date: {today}\nTime: {time_utc}\n\nTo,\nThe Head,\n{department},\n{authority_name}.\n\nSubject: Urgent Complaint regarding {category} at {location_name}\n\nRespected Sir/Madam,\n\nI report identification: {category}\nArea: {location_name}\nLat/Long: {latitude}, {longitude}\n\nPlease inspect.\nReference ID: {complaint_id}\n\nThanking you."
 
 
 @router.put("/complaint/{complaint_id}/status")
 def update_status(complaint_id: str, update: StatusUpdate):
     db = get_database()
+    allowed = ["Submitted", "In Review", "In Progress", "Resolved", "Rejected", "Reported", "Help Arriving", "Closed"]
+    if update.status not in allowed:
+        raise HTTPException(status_code=400, detail="Invalid status")
 
-    allowed_statuses = [
-        "Submitted",
-        "In Review",
-        "In Progress",
-        "Resolved",
-        "Rejected",
-        "Reported",
-        "Help Arriving",
-        "Closed",
-    ]
-
-    if update.status not in allowed_statuses:
-        raise HTTPException(status_code=400, detail="Invalid status value")
-
-    result = db["complaints"].update_one(
-        {"complaint_id": complaint_id},
-        {
-            "$set": {
-                "status": update.status,
-                "updated_at": now_utc()
-            }
-        }
-    )
-
+    result = db["complaints"].update_one({"complaint_id": complaint_id}, {"$set": {"status": update.status, "updated_at": now_utc()}})
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Complaint not found")
+        raise HTTPException(status_code=404, detail="Not found")
+    
     complaint = db["complaints"].find_one({"complaint_id": complaint_id})
     if complaint:
         send_status_update_email(
@@ -909,26 +661,16 @@ def update_status(complaint_id: str, update: StatusUpdate):
             latitude=complaint.get("latitude"),
             longitude=complaint.get("longitude"),
         )
-    return {
-        "message": "Status updated successfully",
-        "complaint_id": complaint_id,
-        "new_status": update.status
-    }
+    return {"message": "Status updated", "complaint_id": complaint_id, "new_status": update.status}
+
 
 def generate_pdf_letter(complaint_id, letter_text):
-
     pdf_path = f"uploads/{complaint_id}.pdf"
-
     doc = SimpleDocTemplate(pdf_path, pagesize=A4)
-    elements = []
-
     styles = getSampleStyleSheet()
-    normal_style = styles["Normal"]
-
+    elements = []
     for line in letter_text.split("\n"):
-        elements.append(Paragraph(line, normal_style))
+        elements.append(Paragraph(line, styles["Normal"]))
         elements.append(Spacer(1, 0.2 * inch))
-
     doc.build(elements)
-
     return pdf_path

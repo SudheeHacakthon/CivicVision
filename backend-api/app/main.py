@@ -6,6 +6,8 @@ from app.database.mongodb import get_database
 from dotenv import load_dotenv
 import logging
 import time
+from fastapi.staticfiles import StaticFiles
+import os
 
 
 
@@ -19,6 +21,10 @@ logger = logging.getLogger("uvicorn")
 
 # Create FastAPI app FIRST
 app = FastAPI()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, "..", "uploads")
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # Custom middleware for logging only /predict API calls
 @app.middleware("http")

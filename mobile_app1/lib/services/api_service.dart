@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -6,7 +7,7 @@ import 'package:http/http.dart' as http;
 class ApiService {
   // Use --dart-define=API_BASE_URL=http://<your-ip>:8000 for real devices.
   // static const String _envBaseUrl = String.fromEnvironment('http://192.168.0.8:8000');
-  static const String _envBaseUrl = "http://192.168.0.10:8000";
+  static const String _envBaseUrl = "http://192.168.0.7:8000";
   static const String _androidDeviceUrl = String.fromEnvironment(
     'API_ANDROID_DEVICE_URL',
     defaultValue: '',
@@ -37,7 +38,7 @@ class ApiService {
   static Future<Map<String, dynamic>> _postJsonWithFallback(
     String path,
     Map<String, dynamic> data, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
     Set<int> successStatusCodes = const {200},
   }) async {
     Object? lastNetworkError;
@@ -95,7 +96,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> _getMapWithFallback(
     String path, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
     Set<int> successStatusCodes = const {200},
   }) async {
     Object? lastNetworkError;
@@ -143,7 +144,7 @@ class ApiService {
 
   static Future<List<dynamic>> _getListWithFallback(
     String path, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
     Set<int> successStatusCodes = const {200},
   }) async {
     Object? lastNetworkError;
@@ -192,7 +193,7 @@ class ApiService {
   static Future<Map<String, dynamic>> _putJsonWithFallback(
     String path,
     Map<String, dynamic> data, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
     Set<int> successStatusCodes = const {200},
   }) async {
     Object? lastNetworkError;
@@ -276,7 +277,7 @@ class ApiService {
                 'reporter_email': (reporterEmail ?? '').trim().toLowerCase(),
               }),
             )
-            .timeout(const Duration(seconds: 20));
+            .timeout(const Duration(seconds: 30));
 
         if (response.statusCode == 200) {
           return json.decode(response.body);
@@ -360,7 +361,7 @@ class ApiService {
       tried.add(candidate);
 
       try {
-        final res = await http.get(uri).timeout(const Duration(seconds: 20));
+        final res = await http.get(uri).timeout(const Duration(seconds: 30));
         if (res.statusCode == 200) return;
 
         lastHttpError = Exception(
@@ -455,7 +456,7 @@ class ApiService {
       try {
         final response = await http
             .post(uri)
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 30));
         if (response.statusCode == 200) {
           return;
         }
