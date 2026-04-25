@@ -538,7 +538,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               );
                             },
                           ),
+                          const SizedBox(height: 6),
+                          Builder(
+                            builder: (context) {
+                              final confidenceRaw = complaint['confidence']?.toString() ?? '0';
+                              final confidence = double.tryParse(confidenceRaw) ?? 0.0;
+                              return Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_outline,
+                                    size: 18,
+                                    color: Colors.black54,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'AI Confidence: ${(confidence * 100).toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: confidence > 0.7 ? Colors.green : Colors.orange,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                           const SizedBox(height: 8),
+
                           Row(
                             children: [
                               const Icon(

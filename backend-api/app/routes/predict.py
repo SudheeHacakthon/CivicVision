@@ -463,7 +463,19 @@ def admin_dashboard():
 @router.get("/analytics")
 def analytics():
     results = list(get_database()["complaints"].aggregate([{"$group": {"_id": "$category", "count": {"$sum": 1}}}]))
-    return {"complaints_by_category": results}
+    
+    merged = {}
+    for r in results:
+        cat_raw = r.get("_id")
+        if not cat_raw:
+            cat = "Unknown"
+        else:
+            cat = str(cat_raw).strip().title()
+            
+        merged[cat] = merged.get(cat, 0) + r.get("count", 0)
+        
+    final_results = [{"_id": k, "count": v} for k, v in merged.items()]
+    return {"complaints_by_category": final_results}
 
 @router.get("/heatmap")
 def get_heatmap_data():

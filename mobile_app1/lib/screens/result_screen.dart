@@ -384,12 +384,7 @@ class _ResultScreenState extends State<ResultScreen> {
                       ? "Translating..."
                       : (translatedIssue ?? issueType),
                 ),
-                _infoTile(
-                  AppTranslations.get("confidence", lang),
-                  isTranslating
-                      ? "Translating..."
-                      : (translatedConfidence ?? confidence),
-                ),
+
                 _infoTile(
                   AppTranslations.get("complaint_id", lang),
                   complaintId,

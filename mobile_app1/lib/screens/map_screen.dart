@@ -195,8 +195,7 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(height: 8),
               Text('Coordinates: $lat, $lng'),
               const SizedBox(height: 8),
-              Text('Confidence: ${issue['confidence'] ?? 'N/A'}'),
-              const SizedBox(height: 8),
+
               Text(
                 'Reported: ${_formatTimeAgo(issue['created_at']?.toString())}',
               ),
