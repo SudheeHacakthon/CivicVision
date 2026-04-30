@@ -180,6 +180,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
     final imagePath = args?['imagePath']?.toString() ?? "";
     final imageBytes = args?['imageBytes'] as Uint8List?;
+    final imageUrl = args?['imageUrl']?.toString();
     final issueType = args?['issueType']?.toString() ?? "Unknown";
     final confidence = args?['confidence']?.toString() ?? "0";
     final complaintId = args?['complaintId']?.toString() ?? "N/A";

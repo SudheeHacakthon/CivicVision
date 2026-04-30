@@ -2,6 +2,12 @@
   "configVersion": 2,
   "packages": [
     {
+      "name": "archive",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/archive-4.0.9",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "args",
       "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/args-2.7.0",
       "packageUri": "lib/",
@@ -39,9 +45,9 @@
     },
     {
       "name": "camera_platform_interface",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/camera_platform_interface-2.12.0",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/camera_platform_interface-2.13.0",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.9"
     },
     {
       "name": "camera_web",
@@ -183,13 +189,13 @@
     },
     {
       "name": "flutter_lucide",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_lucide-1.8.2",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_lucide-1.11.0",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
     {
       "name": "flutter_map",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_map-8.2.2",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_map-8.3.0",
       "packageUri": "lib/",
       "languageVersion": "3.6"
     },
@@ -297,7 +303,7 @@
     },
     {
       "name": "hooks",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/hooks-1.0.2",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/hooks-1.0.3",
       "packageUri": "lib/",
       "languageVersion": "3.10"
     },
@@ -315,13 +321,13 @@
     },
     {
       "name": "image_picker",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/image_picker-1.2.1",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/image_picker-1.2.2",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.9"
     },
     {
       "name": "image_picker_android",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/image_picker_android-0.8.13+15",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/image_picker_android-0.8.13+17",
       "packageUri": "lib/",
       "languageVersion": "3.9"
     },
@@ -368,6 +374,18 @@
       "languageVersion": "3.3"
     },
     {
+      "name": "jni",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/jni-1.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "jni_flutter",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/jni_flutter-1.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
       "name": "latlong2",
       "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/latlong2-0.9.1",
       "packageUri": "lib/",
@@ -398,18 +416,6 @@
       "languageVersion": "3.8"
     },
     {
-      "name": "lists",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/lists-1.0.1",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "logger",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/logger-2.7.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.17"
-    },
-    {
       "name": "logging",
       "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/logging-1.3.0",
       "packageUri": "lib/",
@@ -435,9 +441,9 @@
     },
     {
       "name": "mgrs_dart",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/mgrs_dart-2.0.0",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/mgrs_dart-3.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.0"
     },
     {
       "name": "mime",
@@ -470,8 +476,14 @@
       "languageVersion": "3.10"
     },
     {
+      "name": "package_config",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/package_config-2.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "package_info_plus",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/package_info_plus-9.0.0",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/package_info_plus-9.0.1",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
@@ -495,7 +507,7 @@
     },
     {
       "name": "path_provider_android",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_android-2.2.23",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_android-2.3.1",
       "packageUri": "lib/",
       "languageVersion": "3.9"
     },
@@ -548,10 +560,16 @@
       "languageVersion": "3.0"
     },
     {
-      "name": "proj4dart",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/proj4dart-2.1.0",
+      "name": "posix",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/posix-6.5.0",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "proj4dart",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/proj4dart-3.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "provider",
@@ -564,6 +582,12 @@
       "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/pub_semver-2.2.0",
       "packageUri": "lib/",
       "languageVersion": "3.4"
+    },
+    {
+      "name": "record_use",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/record_use-0.6.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.10"
     },
     {
       "name": "rxdart",
@@ -618,6 +642,12 @@
       "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/shimmer-3.0.0",
       "packageUri": "lib/",
       "languageVersion": "2.17"
+    },
+    {
+      "name": "simple_sparse_list",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/simple_sparse_list-0.1.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "sky_engine",
@@ -675,9 +705,9 @@
     },
     {
       "name": "unicode",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/unicode-0.3.1",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/unicode-1.1.9",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.0"
     },
     {
       "name": "url_launcher",
@@ -741,7 +771,7 @@
     },
     {
       "name": "vm_service",
-      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/vm_service-15.0.2",
+      "rootUri": "file:///C:/Users/rithw/AppData/Local/Pub/Cache/hosted/pub.dev/vm_service-15.2.0",
       "packageUri": "lib/",
       "languageVersion": "3.5"
     },

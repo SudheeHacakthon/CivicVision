@@ -73,6 +73,71 @@ class _CaptureScreenState extends State<CaptureScreen> {
   bool _isProcessing = false;
   String? _capturedImagePath; // To show the freeze-frame
 
+  void showDuplicateDialog(BuildContext context, String issueId) {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final email = auth.email;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(Icons.info_outline, color: Colors.orange, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Issue Already Reported",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          "Our AI detected that this issue has already been reported by another citizen and is currently being tracked.\n\nWould you like to upvote it to highlight its importance and track its progress?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF007AFF),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () async {
+              try {
+                await ApiService.upvoteComplaint(issueId, email);
+                if (context.mounted) {
+                  Navigator.pop(context); // Close dialog
+                  // Navigate to complaints screen
+                  Navigator.pushReplacementNamed(context, '/complaints');
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error upvoting: $e")),
+                  );
+                }
+              }
+            },
+            child: const Text("Upvote & Track"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +146,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       _controller!.initialize().then((_) => setState(() {}));
     }
   }
+
 
   Future<void> _takePictureAndTag() async {
     if (_isProcessing ||
@@ -130,9 +196,26 @@ class _CaptureScreenState extends State<CaptureScreen> {
         reporterEmail,
       );
 
+      print("FULL RESPONSE: $result");
+      print("Duplicate value: ${result["duplicate"]}");
+
       print("BACKEND RESPONSE: $result");
 
+      // 🔥 HANDLE DUPLICATE FIRST
+      if (result["duplicate"] == true) {
+        showDuplicateDialog(context, result["issue_id"]);
+        setState(() => _isProcessing = false);
+        return;
+      }
+
+// ✅ THEN handle normal response
       final complaint = result['complaint'];
+
+    //   if (complaint == null) {
+    //     throw Exception(
+    //     "Backend error: ${result['detail'] ?? 'Complaint data is null'}",
+    //   );
+    //  }
 
       if (complaint == null) {
         throw Exception(
@@ -198,6 +281,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
             'complaintId': complaint['complaint_id']?.toString() ?? "N/A",
             'letter': result['letter']?.toString() ?? "Letter not generated",
             'deadlineDays': result['deadline_days'] ?? 5,
+            'imageUrl': result['image_url'],
           },
         );
       }

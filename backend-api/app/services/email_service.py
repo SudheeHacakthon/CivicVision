@@ -118,3 +118,85 @@ def send_emergency_alert_email(
         smtp.starttls()
         smtp.login(sender_email, app_password)
         smtp.send_message(message)
+def send_status_update_email(
+    recipients: list[str],
+    complaint_id: str,
+    new_status: str,
+    category: str,
+    location_name: str,
+    latitude: float,
+    longitude: float,
+):
+    maps_link = f"https://www.google.com/maps?q={latitude},{longitude}"
+    sender_email, app_password = _get_mail_config()
+
+    clean_recipients = [email.strip() for email in recipients if email and email.strip()]
+    if not clean_recipients:
+        return
+
+    # Prepare subject and bodies once
+    subject = f"Update on your complaint ({complaint_id})"
+    
+    # Plain text
+    text_body = f"""
+Hello,
+
+Your complaint has been updated.
+
+Complaint ID: {complaint_id}
+Category: {category}
+Location: {location_name}
+Status: {new_status}
+
+Coordinates: {latitude}, {longitude}
+
+View on map:
+{maps_link}
+
+Thank you for using CivicVision.
+"""
+
+    # HTML (better UI)
+    html_body = f"""
+<html>
+    <body>
+        <h3>Complaint Status Update</h3>
+        <p>
+            <b>Complaint ID:</b> {complaint_id}<br>
+            <b>Category:</b> {category}<br>
+            <b>Location:</b> {location_name}<br>
+            <b>Status:</b> <span style="color:blue;"><b>{new_status}</b></span><br>
+            <b>Coordinates:</b> {latitude}, {longitude}
+        </p>
+        <p>
+            <a href="{maps_link}" 
+               style="background:#2196F3;color:white;padding:10px 15px;
+                      text-decoration:none;border-radius:5px;">
+               📍 View on Map
+            </a>
+        </p>
+        <p>Thank you for using CivicVision.</p>
+    </body>
+</html>
+    """
+
+    # Send individual messages to each recipient
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
+        smtp.starttls()
+        smtp.login(sender_email, app_password)
+
+        for recipient in clean_recipients:
+            msg = EmailMessage()
+
+            msg["Subject"] = subject
+            msg["From"] = sender_email
+            msg["To"] = recipient
+
+            # Plain text
+            msg.set_content(text_body)
+
+            # HTML
+            msg.add_alternative(html_body, subtype="html")
+
+            # Send to this recipient
+            smtp.send_message(msg)

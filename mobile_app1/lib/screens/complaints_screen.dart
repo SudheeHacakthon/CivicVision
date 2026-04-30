@@ -238,7 +238,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                         itemCount: _complaints.length,
                         itemBuilder: (context, index) {
                           final complaint = _complaints[index];
-                          final id = complaint['complaint_id']?.toString() ?? 'N/A';
+                          final id = complaint['complaint_id']?.toString() ?? '';
                           final readableId = _toReadableId(id);
                           final category = complaint['category']?.toString() ?? 'N/A';
                           final status = complaint['status']?.toString() ?? 'N/A';
@@ -252,6 +252,21 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
                               ? rawImageUrl
                               : '${ApiService.baseUrl}/complaint/$id/image';
 
+                          
+                          
+                          // final rawPath = complaint['image_path'] ?? '';
+//                           final imageUrl = complaint['image_display'] ?? '';
+
+// // 🔥 normalize path completely
+//                           final cleanPath = rawPath
+//                                           .toString()
+//                                           .replaceAll("\\", "/")
+//                                           .replaceAll("//", "/");
+
+//                           final imageUrl = cleanPath.startsWith('http')
+//                                         ? cleanPath
+//                                         : '${ApiService.baseUrl}/$cleanPath';
+                          print("IMAGE PATH: ${complaint['image_path']}");
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             elevation: 2,

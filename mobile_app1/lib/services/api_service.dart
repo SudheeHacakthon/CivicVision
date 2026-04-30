@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -5,10 +6,10 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Use --dart-define=API_BASE_URL=http://<your-ip>:8000 for real devices.
-  static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
-  static const String _androidDeviceUrl = String.fromEnvironment(
-    'API_ANDROID_DEVICE_URL',
-    defaultValue: '',
+  // static const String _envBaseUrl = String.fromEnvironment('http://192.168.0.8:8000');
+  static const String _envBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://192.168.1.22:8000',
   );
 
   static bool _isLoopbackUrl(String value) {
@@ -37,7 +38,6 @@ class ApiService {
 
   static List<String> _baseUrlCandidates() {
     final explicitBaseUrl = _envBaseUrl.trim();
-    final androidDeviceUrl = _androidDeviceUrl.trim();
 
     if (kIsWeb) {
       if (explicitBaseUrl.isNotEmpty) return [explicitBaseUrl];
@@ -51,10 +51,6 @@ class ApiService {
         candidates.add(explicitBaseUrl);
       }
 
-      if (androidDeviceUrl.isNotEmpty) {
-        // Real-device URL must be supplied explicitly to avoid stale LAN IP defaults.
-        candidates.add(androidDeviceUrl);
-      }
 
       // Android emulator host loopback.
       candidates.add('http://10.0.2.2:8000');
@@ -77,7 +73,7 @@ class ApiService {
   static Future<Map<String, dynamic>> _postJsonWithFallback(
     String path,
     Map<String, dynamic> data, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
     Set<int> successStatusCodes = const {200},
   }) async {
     Object? lastNetworkError;
@@ -135,7 +131,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> _getMapWithFallback(
     String path, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
     Set<int> successStatusCodes = const {200},
   }) async {
     Object? lastNetworkError;
@@ -183,7 +179,7 @@ class ApiService {
 
   static Future<List<dynamic>> _getListWithFallback(
     String path, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
     Set<int> successStatusCodes = const {200},
   }) async {
     Object? lastNetworkError;
@@ -232,7 +228,7 @@ class ApiService {
   static Future<Map<String, dynamic>> _putJsonWithFallback(
     String path,
     Map<String, dynamic> data, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
     Set<int> successStatusCodes = const {200},
   }) async {
     Object? lastNetworkError;
@@ -316,7 +312,7 @@ class ApiService {
                 'reporter_email': (reporterEmail ?? '').trim().toLowerCase(),
               }),
             )
-            .timeout(const Duration(seconds: 20));
+            .timeout(const Duration(seconds: 30));
 
         if (response.statusCode == 200) {
           return json.decode(response.body);
@@ -388,10 +384,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> upvoteComplaint(
     String complaintId,
-    String email,
+    String? email,
   ) async {
     return _postJsonWithFallback(
-      '/complaint/$complaintId/upvote',
+      '/complaints/$complaintId/upvote',
       {'email': email},
       successStatusCodes: const {200},
     );
@@ -409,7 +405,7 @@ class ApiService {
       tried.add(candidate);
 
       try {
-        final res = await http.get(uri).timeout(const Duration(seconds: 20));
+        final res = await http.get(uri).timeout(const Duration(seconds: 30));
         if (res.statusCode == 200) return;
 
         lastHttpError = Exception(
@@ -510,9 +506,33 @@ class ApiService {
   }
 
   static Future<void> forgotPassword(String email) async {
-    await _postJsonWithFallback('/auth/forgot-password', {
-      'email': email.trim().toLowerCase(),
-    });
+    Object? lastNetworkError;
+    final tried = <String>[];
+
+    for (final candidate in _baseUrlCandidates()) {
+      final uri = Uri.parse(
+        '$candidate/auth/forgot-password?email=${Uri.encodeQueryComponent(email)}',
+      );
+      tried.add(candidate);
+
+      try {
+        final response = await http
+            .post(uri)
+            .timeout(const Duration(seconds: 30));
+        if (response.statusCode == 200) {
+          return;
+        }
+        throw Exception('Forgot password failed: ${response.body}');
+      } on TimeoutException catch (e) {
+        lastNetworkError = e;
+      } on http.ClientException catch (e) {
+        lastNetworkError = e;
+      }
+    }
+
+    throw Exception(
+      'Could not send OTP. Tried: ${tried.join(', ')}. Last error: $lastNetworkError',
+    );
   }
 
   // ---------------- EMERGENCY ----------------
@@ -596,4 +616,5 @@ class ApiService {
       'new_password': newPassword.trim(),
     });
   }
+
 }
