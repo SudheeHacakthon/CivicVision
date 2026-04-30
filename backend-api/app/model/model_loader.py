@@ -10,7 +10,14 @@ MODEL_PATH = os.path.join(BASE_DIR, "civic_model.keras")
 CLASS_NAMES_PATH = os.path.join(BASE_DIR, "class_names.json")
 CONFIDENCE_THRESHOLD = 0.65
 
-model = tf.keras.models.load_model(MODEL_PATH)
+_model = None
+
+def get_model():
+    global _model
+    if _model is None:
+        print("LOADING CLASSIFICATION MODEL...")
+        _model = tf.keras.models.load_model(MODEL_PATH)
+    return _model
 
 
 def _load_class_names():
@@ -34,7 +41,7 @@ def predict_image(img_path):
     img_array = np.expand_dims(img_array, axis=0)
     img_array = img_array / 255.0
 
-    predictions = model.predict(img_array, verbose=0)[0]
+    predictions = get_model().predict(img_array, verbose=0)[0]
     class_index = int(np.argmax(predictions))
     confidence = float(predictions[class_index])
     predicted_category = CLASS_NAMES[class_index]

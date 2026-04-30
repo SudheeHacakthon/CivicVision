@@ -12,10 +12,22 @@ from transformers import CLIPProcessor, CLIPModel
 # ==========================
 # 🔷 Load CLIP Model (once)
 # ==========================
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+_model = None
+_processor = None
 
-model.eval()
+def get_clip_model():
+    global _model
+    if _model is None:
+        print("LOADING CLIP AI MODEL...")
+        _model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        _model.eval()
+    return _model
+
+def get_clip_processor():
+    global _processor
+    if _processor is None:
+        _processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    return _processor
 
 # ==========================
 # 🔷 Config
@@ -74,10 +86,10 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 def get_embedding(image_path):
     image = Image.open(image_path).convert("RGB")
 
-    inputs = processor(images=image, return_tensors="pt")
+    inputs = get_clip_processor()(images=image, return_tensors="pt")
 
     with torch.no_grad():
-        features = model.get_image_features(**inputs)
+        features = get_clip_model().get_image_features(**inputs)
 
     if hasattr(features, "cpu"):   # tensor case
         embedding = features.cpu().numpy()[0]
