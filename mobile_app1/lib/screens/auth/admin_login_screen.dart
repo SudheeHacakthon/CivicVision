@@ -30,10 +30,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       _emailController.text,
       _passwordController.text,
     );
+    
+    if (!mounted) return;
+    
     setState(() => _isLoading = false);
 
     if (success) {
-      if (mounted) Navigator.pushReplacementNamed(context, '/');
+      Navigator.pushReplacementNamed(context, '/');
     } else {
       final detailedError = auth.lastError;
       setState(() {

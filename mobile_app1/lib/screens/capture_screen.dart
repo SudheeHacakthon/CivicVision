@@ -116,6 +116,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
       // Read image bytes directly from XFile to support web and mobile.
       final imageBytes = await image.readAsBytes();
+      
+      if (imageBytes.isEmpty) {
+        throw Exception("Failed to capture image data. Please check your device storage.");
+      }
 
       // 🤖 Call Backend API
       final reporterEmail = context.read<AuthProvider>().email;

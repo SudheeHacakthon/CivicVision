@@ -30,10 +30,12 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
       _emailController.text,
       _passwordController.text,
     );
+    
+    if (!mounted) return;
+    
     setState(() => _isLoading = false);
-
     if (success) {
-      if (mounted) Navigator.pushReplacementNamed(context, '/');
+      Navigator.pushReplacementNamed(context, '/');
     } else {
       setState(
         () => _error =

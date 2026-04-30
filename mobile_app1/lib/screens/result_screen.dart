@@ -370,7 +370,17 @@ class _ResultScreenState extends State<ResultScreen> {
                   )
                 : (kIsWeb
                       ? Image.network(imagePath, fit: BoxFit.cover)
-                      : Image.file(File(imagePath), fit: BoxFit.cover)),
+                      : Image.file(
+                          File(imagePath),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => const Center(
+                            child: Icon(
+                              Icons.image_not_supported,
+                              size: 70,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        )),
           ),
 
           Padding(
